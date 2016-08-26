@@ -14,5 +14,7 @@ module ml505top (
 
     // AND gate example (LED 0 shows (GPIO 1)*(GPIO 2)):
     and (GPIO_LED[0], GPIO_DIP[0], GPIO_DIP[1]);
+    
+    assign GPIO_LED[7:1] = 0;
 
 endmodule
