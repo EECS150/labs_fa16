@@ -107,5 +107,15 @@ Whenever a new lab is released, you should only need to do a \verb|git pull| to 
 For now, you will only have pull access to this repository. If you make any local commits, you will not be able to push them to the remote server. Later on, each team will receive their own private repo for the project, and you will be able to push and pull from that.
 
 \section{Your First FPGA Design}
+Throughout the semester, you will build increasingly complex designs using Verilog, a widely used hardware description language (HDL). For this lab, you will use very basic Verilog to describe a simple digital circuit.\\
+
+Now that you have cloned the \verb|labs_fa16| repository, you can \verb|cd| inside the 
+\verb|labs_fa16/lab0| directory to see this lab's skeleton files. You will note that there is a \verb|src| directory, a \verb|cfg| directory, and a Makefile. \\
+
+The \verb|cfg| directory contains files that are used by the FPGA toolchain. We will learn about all the build tools in the toolchain and their configurations in the next lab, but for now you can ignore the \verb|cfg| directory and its contents. \\
+
+The \verb|src| directory contains files you can edit that describe the circuit you want to create on the FPGA. There are two files in this directory. \verb|ml505top.v| is a Verilog source file that represents the top-level of your circuit and it has access to the signals that come in and out of the FPGA chip. \verb|ml505top.ucf| is known as a User Constraints File and it describes what signals your top-level Verilog source file can use in your digital circuit design. For now, don't concern yourself with the details of the UCF file, as that will be covered in detail in the next lab. Open the \verb|ml505top.v| file in your preferred text editor (vim, emacs, nano, gedit, etc.) to get started. \\
+
+
 
 \end{document}
