@@ -109,13 +109,23 @@ For now, you will only have pull access to this repository. If you make any loca
 \section{Your First FPGA Design}
 Throughout the semester, you will build increasingly complex designs using Verilog, a widely used hardware description language (HDL). For this lab, you will use very basic Verilog to describe a simple digital circuit.\\
 
-Now that you have cloned the \verb|labs_fa16| repository, you can \verb|cd| inside the 
+Now that you have cloned the \verb|labs_fa16| repository, you can \verb|cd| to the 
 \verb|labs_fa16/lab0| directory to see this lab's skeleton files. You will note that there is a \verb|src| directory, a \verb|cfg| directory, and a Makefile. \\
 
 The \verb|cfg| directory contains files that are used by the FPGA toolchain. We will learn about all the build tools in the toolchain and their configurations in the next lab, but for now you can ignore the \verb|cfg| directory and its contents. \\
 
 The \verb|src| directory contains files you can edit that describe the circuit you want to create on the FPGA. There are two files in this directory. \verb|ml505top.v| is a Verilog source file that represents the top-level of your circuit and it has access to the signals that come in and out of the FPGA chip. \verb|ml505top.ucf| is known as a User Constraints File and it describes what signals your top-level Verilog source file can use in your digital circuit design. For now, don't concern yourself with the details of the UCF file, as that will be covered in detail in the next lab. Open the \verb|ml505top.v| file in your preferred text editor (vim, emacs, nano, gedit, etc.) to get started. \\
 
+This file contains a Verilog module description which specifies which signals are inputs into the module and what signals are outputs.\\ 
 
+The \verb|GPIO_DIP| input is a signal that is 8 bits wide (as indicated by the [7:0] width descriptor). This input signal represents the logic signals coming from the DIP switches on the bottom right side of the FPGA development board at your workstation. You should inspect your board to find these switches and confirm that there are 8 switches. \\
+
+The \verb|GPIO_LED| output is a signal that is also 8 bits wide (as indicated by the [7:0] width descriptor). This output signal represents the logic signals coming out of the FPGA and going into the bank of LEDs at the bottom center of the FPGA development board. You should inspect your board to find these LEDs and confirm that there are 8 LEDs. \\
+
+In this file, we can describe how the DIP switches and the LEDs on the board are connected through the FPGA. There is one line of code that describes an AND gate that takes the values of the first 2 DIP switches, ANDs them together, and sends that signal out to the first LED. Let's put this digital circuit on the FPGA!\\
+
+In the \verb|lab0| directory, execute the command \verb|make| in your terminal. This will execute the default build process as defined by the Makefile. This might take a few minutes to complete. Once the process has completed, execute the command \verb|make impact| in your terminal to send the digital circuit to the FPGA. \\
+
+Now give it a try. Physically toggle the first two DIP switches on the board and watch as the first LED lights up only when both switches are toggled high. Go ahead and extend this example with more AND or other gates to see them in action!
 
 \end{document}
