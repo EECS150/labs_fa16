@@ -1,5 +1,5 @@
 module tone_generator (
-    input disable_output,
+    input output_enable,
     input clk,
     output square_wave_out
 );
