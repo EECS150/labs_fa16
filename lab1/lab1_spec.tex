@@ -95,7 +95,7 @@ Another output of XST is a NGR file which can be viewed with Xilinx ISE (as we w
 The final product of synthesis is a netlist file (NGC); it is a text file that contains a list of all the instances of primitive components in the translated circuit and a description of how they are connected.
 
 \subsection{Translation and Mapping with NGDBuild and Map}
-The tools that perform translation and mapping are NGDBuild and Map respectively. These tools take the output of the synthesis tool (a generic netlist) and translates each component to an equivalent on the specific Xilinx vc5vlx110t FPGAs we have in the lab. 
+The tools that perform translation and mapping are NGDBuild and Map respectively. These tools take the output of the synthesis tool (a generic netlist) and translates each LUT and primitive FPGA element to an equivalent on the specific Xilinx vc5vlx110t FPGAs we have in the lab. 
 
 The translation tool merges all the input netlists and design constraint information and outputs a Xilinx Native Generic Database (NGD) file. NGDBuild takes the UCF (User Constraints File) and the NGC (from XST) files as inputs.
 
@@ -154,7 +154,7 @@ Navigate to the \verb|/lab1/src| directory. Begin by opening \verb|full_adder.v|
 
 Finally, inspect the \verb|ml505top.v| top-level module and see how your structural adder is instantiated and hooked up to the top-level signals.
 
-Run \verb|make| in the \verb|/lab1| directory and let the build process complete. Then run \verb|make impact| to send your design to the FPGA. Test out your design and see that you get the correct results from your adder.
+Run \verb|make| in the \verb|/lab1| directory and let the build process complete. Then run \verb|make impact| to send your design to the FPGA. Test out your design and see that you get the correct results from your adder. You should try entering different binary numbers into your adder with the DIP switches and see that the correct sum is displayed on the first 5 LEDs. 
 
 \subsection{Inspection of Structural Adder Using Schematic and fpga\_editor}
 Now let's take a look at how the Verilog you wrote mapped to the primitive components on the FPGA. To do this, we will first look at a high-level schematic of your circuit using Xilinx ISE.\\
