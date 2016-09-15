@@ -22,7 +22,7 @@ module tone_generator_testbench();
     initial begin
         output_enable <= 0;
         #(500 * `MS);
-	output_enable <= 0;
+	output_enable <= 1;
         #(1 * `SECOND);
         $finish();
     end
