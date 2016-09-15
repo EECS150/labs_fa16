@@ -11,7 +11,7 @@ module tone_generator_testbench();
     wire sq_wave;
 
     initial clock = 0;
-    always #(30.3) clock <= ~clock;
+    always #(30.3/2) clock <= ~clock;
 
     tone_generator piezo_controller (
         .clk(clock),
