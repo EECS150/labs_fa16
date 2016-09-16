@@ -13,7 +13,7 @@
 
 \begin{document}
 \title{EECS 151/251A FPGA Lab\\
-Lab 2: Simulation, Basic FSMs, and Memories}
+Lab 2: Simulation, Inter-module Communication, and Memories}
 
 \author{Prof. Borivoje Nikolic \\
 TA: Vighnesh Iyer \\Department of Electrical Engineering and Computer Sciences\\
@@ -42,7 +42,7 @@ At various times in this lab, things will just not work on the FPGA or simulatio
 
 \section{Lab Overview}
 
-In this lab, we will begin by taking your \verb|tone_generator| design from Lab 1 and simulating it in software. We will learn about using ModelSim to view waveforms and debug your circuits. You will then extend your \verb|tone_generator| to play a configurable frequency square wave and simulate it to check that you have implemented the functionality correctly. You will then construct a state machine that can pull tones to play from a memory block and send them to your \verb|tone_generator| for a specified amount of time each. Finally, you will modify your state machine so that it can be paused, and so it can play the tones and different tempos.
+In this lab, we will begin by taking your \verb|tone_generator| design from Lab 1 and simulating it in software. We will learn about using ModelSim to view waveforms and debug your circuits. You will then extend your \verb|tone_generator| to play a configurable frequency square wave and simulate it to check that you have implemented the functionality correctly. You will then construct a module that can pull tones to play from a memory block and send them to your \verb|tone_generator| for a specified amount of time each. Finally, you will modify your module so that it can be paused, and so it can play the tones at different tempos.
 
 \section{Simulating the tone\_generator from Lab 1}
 
@@ -243,20 +243,54 @@ I suggest using \url{http://onlinetonegenerator.com/} to generate sample square 
 
 Create a testbench that plays some simple melody that you define and show the TA before proceeding further.
 
-\section{Try tone\_generator on the FPGA}
-Modify the top-level Verilog module \verb|ml505top.v| to include the new input to the \verb|tone_generator|. You can tie the new input to any value you want.
+\section{Try the tone\_generator on the FPGA}
+Modify the top-level Verilog module \verb|ml505top.v| to include the new input to the \verb|tone_generator|. You can tie the \verb|tone_switch_period| to any value you want.
 
 Run the usual \verb|make| process and then \verb|make impact| to put your new \verb|tone_generator| on the FPGA. It should work as it did before.
 
-\section{Introduction to Inferred Asynchronous Memories}
+\section{Introduction to Inferred Asynchronous Memories - ROMs}
+An asynchronous memory is a memory block that isn't governed by a clock. In this lab, we will use a Python script to generate a ROM block in Verilog.\\
 
+A ROM is a read-only memory. A ROM can be broadly classed as a state element that holds some fixed data. This data can be accessed by supplying an address to the ROM after which the ROM will output the data from that address. Any memory block in general can contain as many addresses in which to store data as you desire. Every address contains some amount of data (bits), but every address should store the same amount of data. The number of addresses is called the \textbf{depth} of the memory, while the number of bits per address is called the \textbf{width} of the memory. These are important terms that are frequently used. \\
 
+The synthesizer is a powerful tool that takes the Verilog you write and converts it into a low-level netlist of what structures are actually used on the FPGA. Our Verilog \textbf{describes} some digital circuits which are then \textbf{inferred} by the synthesizer. In this section, we will examine the Verilog that allows the synthesizer (XST) to \textbf{infer} a ROM. What follows is a minimal example of a ROM in Verilog: (depth of 8 entries/addresses, width of 8 bits)
 
-\section{Design of the music\_streamer FSM}
+\begin{minted}{verilog}
+module rom (input [2:0] address, output reg [7:0] data);
+	always @(*) begin
+		case(address)
+			3'd0: 8'h00
+			3'd1: 8'hFF
+			3'd2: 8'hAD
+			3'd3: 8'h12
+			3'd4: 8'h37
+			3'd5: 8'h93
+			3'd6: 8'h0A
+			3'd7: 8'hC2
+		endcase
+	end
+endmodule
+\end{minted}
+
+To power our \verb|tone_generator|, we will be using a ROM that is X entries/addresses deep and 24 bits wide. The ROM will contain tones that the \verb|tone_generator| will play. You can choose the depth of your ROM based on the sequence of tones you want to play.
+
+To generate a ROM with a script, first begin by creating a file that will define the memory contents with any name you choose. The file should contain a decimal number on each line which represents the data stored at that address. I've provided an example file called \verb|sample_data.txt| in the \verb|lab2/| folder. Each line of this file is the \verb|tone_switch_period| of a single note. The duration of each note will be specified later.
+
+Use the provided python script to generate a ROM Verilog file:
+
+\begin{minted}{bash}
+	python rom_generator.py rom.v sample_data.txt 128 24
+\end{minted}
+
+This will generate a ROM in \verb|rom.v| using the data from \verb|sample_data.txt| with a width of 24 bits and a depth of 128 entries/addresses. Try it out and make sure you understand what the script is doing. We will explore ways of generating a ROM/RAM from an initialization file using Verilog alone in a future lab.
+
+\section{Design of the music\_streamer}
+Open up the \verb|music_streamer.v| file. This module will contain an instance of the ROM you created earlier and will address the ROM sequentially to play tones. The output of this module, called \verb|tone| should be fed into the \verb|tone_generator|'s \verb|tone_switch_period| input. Leave the \verb|tempo| and \verb|pause| ports unconnected.\\
+
+Begin by instantiating the \verb|music_streamer| module in \verb|ml505top.v|. Connect its \verb|tone| output to the \verb|tone_switch_period| input of the \verb|tone_generator|.
 
 \section{Simulating the music\_streamer}
 
-\section{Adding Tempo Variations to the music\_streamer}
+\section{Adding Tempo Variations and Pausing to the music\_streamer}
 
-\section{Try it on the FPGA!}
 \end{document}
