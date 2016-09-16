@@ -23,7 +23,7 @@ College of Engineering, University of California, Berkeley}
 
 \section{Before You Start This Lab}
 
-Before you proceed with the contents of this lab, we strongly suggest that you look through three documents that will help you better understand some Verilog constructs.
+Before you proceed with the contents of this lab, we suggest that you look through three documents that will help you better understand some Verilog constructs.
 
 \begin{enumerate}
 	\item \textbf{labs\_fa16/docs/Verilog/wire\_vs\_reg.pdf} - The differences between wire and reg nets and when to use each of them.
@@ -34,10 +34,10 @@ Before you proceed with the contents of this lab, we strongly suggest that you l
 
 \end{enumerate}
 
-You should go through the \verb|verilog_fsm.pdf| document before doing the last part of this lab. The first couple sections of this lab focus on simulation and it would be valuable to read the first two documents before starting.
+The first couple sections of this lab focus on simulation and it would be valuable to read the first two documents before starting.
 
 \subsection{Helpful Hint: Synthesis Warnings and Errors}
-At various times in this lab, things will just not work on the FPGA or simulation. To help with debugging, you can run \verb|make synth| in the \verb|lab2/| folder. This will just run \verb|xst| which will only take a few seconds. Then you should run \verb|make report|. In the window that opened, click on \verb|Synthesis Messages| on the left under \verb|Errors and Warnings|. Any synthesis warnings you see here are a possible alert to some issue in your circuit. If you don't understand a warning, ask a TA; it almost always reveals some issue in your RTL.
+At various times in this lab, things will just not work on the FPGA or in simulation. To help with debugging, you can run \verb|make synth| in the \verb|lab2/| folder. This will just run \verb|xst| which will only take a few seconds. Then you should run \verb|make report|. In the window that opened, click on \verb|Synthesis Messages| on the left under \verb|Errors and Warnings|. Any synthesis warnings you see here are a possible alert to some issue in your circuit. If you don't understand a warning, ask a TA; it almost always reveals some issue in your RTL.
 
 \section{Lab Overview}
 
@@ -228,10 +228,11 @@ Play around with the testbench by altering the clock frequency, changing when yo
 
 Let's extend our \verb|tone_generator| so that it can play different notes. Add a 24-bit input to the \verb|tone_generator| module called \verb|tone_switch_period|. Note you will also have to modify your \verb|clock_counter| to be 24 bits wide.\\
 
-The \verb|tone_switch_period| describes how many clock cycles you should hold the value of your square wave before inverting it. For example a \verb|tone_switch_period| of 37500 tells us to invert the square wave every 37500 clock cycles, which for a 33 Mhz clock translates to a 440 Hz square wave.
+The \verb|tone_switch_period| describes how many clock cycles you should hold the value of your square wave output before inverting it. For example a \verb|tone_switch_period| of 37500 tells us to invert the square wave output every 37500 clock cycles, which for a 33 Mhz clock translates to a 440 Hz square wave.\\
 
-You may have to modify the architecture of your \verb|tone_generator| to accommodate this new input signal. You should reset the internal clock counter every \verb|tone_switch_period| cycles and should invert the square wave output. Remember to initialize any new registers declared in your \verb|tone_generator| to their default value to prevent unknowns during simulation.
+You may have to modify the architecture of your \verb|tone_generator| to accommodate this new input signal. You should reset the internal \verb|clock_counter| every \verb|tone_switch_period| cycles and should also invert the square wave output. Remember to initialize any new registers declared in your \verb|tone_generator| to their default value to prevent unknowns during simulation.
 
+\textbf{It is highly recommended that you draw the circuit you are about to implement before you write the code for it. Show the TA a schematic of the proposed circuit to verify that it matches the specification.}
 \section{Simulating and Debugging Your New tone\_generator}
 
 Now, extend the testbench to work with this new input signal. Add a new 24-bit reg to the testbench. Set \verb|output_enable| to 1 at the start of the simulation. Then set the \verb|tone_switch_period| of the DUT and run the simulation for some time (using a delay statement). Then change the \verb|tone_switch_period| again and run the simulation for some more time.\\
@@ -250,9 +251,9 @@ Run the usual \verb|make| process and then \verb|make impact| to put your new \v
 \section{Introduction to Inferred Asynchronous Memories - ROMs}
 An asynchronous memory is a memory block that isn't governed by a clock. In this lab, we will use a Python script to generate a ROM block in Verilog.\\
 
-A ROM is a read-only memory. A ROM can be broadly classed as a state element that holds some fixed data. This data can be accessed by supplying an address to the ROM after which the ROM will output the data from that address. Any memory block in general can contain as many addresses in which to store data as you desire. Every address contains some amount of data (bits), but every address should store the same amount of data. The number of addresses is called the \textbf{depth} of the memory, while the number of bits per address is called the \textbf{width} of the memory. These are important terms that are frequently used. \\
+A ROM is a read-only memory. A ROM can be broadly classed as a state element that holds some fixed data. This data can be accessed by supplying an address to the ROM after which the ROM will output the data from that address. Any memory block in general can contain as many addresses in which to store data as you desire. Every address should contain the same amount of data (bits). The number of addresses is called the \textbf{depth} of the memory, while the number of bits per address is called the \textbf{width} of the memory. These are important terms that are frequently used. \\
 
-The synthesizer is a powerful tool that takes the Verilog you write and converts it into a low-level netlist of what structures are actually used on the FPGA. Our Verilog \textbf{describes} some digital circuits which are then \textbf{inferred} by the synthesizer. In this section, we will examine the Verilog that allows the synthesizer (XST) to \textbf{infer} a ROM. What follows is a minimal example of a ROM in Verilog: (depth of 8 entries/addresses, width of 8 bits)
+The synthesizer is a powerful tool that takes the Verilog you write and converts it into a low-level netlist of the structures are actually used on the FPGA. Our Verilog \textbf{describes} the functionality of some digital circuit and the synthesizer \textbf{infers} what that functional description actually represents. In this section, we will examine the Verilog that allows the synthesizer (XST) to \textbf{infer} a ROM. What follows is a minimal example of a ROM in Verilog: (depth of 8 entries/addresses, width of 8 bits)
 
 \begin{minted}{verilog}
 module rom (input [2:0] address, output reg [7:0] data);
@@ -271,17 +272,17 @@ module rom (input [2:0] address, output reg [7:0] data);
 endmodule
 \end{minted}
 
-To power our \verb|tone_generator|, we will be using a ROM that is X entries/addresses deep and 24 bits wide. The ROM will contain tones that the \verb|tone_generator| will play. You can choose the depth of your ROM based on the sequence of tones you want to play.
+To power our \verb|tone_generator|, we will be using a ROM that is X entries/addresses deep and 24 bits wide. The ROM will contain tones that the \verb|tone_generator| will play. You can choose the depth of your ROM based on the length of the sequence of tones you want to play.
 
-To generate a ROM with a script, first begin by creating a file that will define the memory contents with any name you choose. The file should contain a decimal number on each line which represents the data stored at that address. I've provided an example file called \verb|sample_data.txt| in the \verb|lab2/| folder. Each line of this file is the \verb|tone_switch_period| of a single note. The duration of each note will be specified later.
+To generate a ROM with a script, first begin by creating a file that will define the memory contents. The file should contain a decimal number on each line which represents the data stored at that address (line number). I've provided an example file called \verb|sample_data.txt| in the \verb|lab2/| folder. Each line of this file represents the \verb|tone_switch_period| of a single note. The duration of each note will be specified later.
 
-Use the provided python script to generate a ROM Verilog file (run in \verb|lab2/|):
+Use the provided Python script to generate a ROM Verilog file (run in \verb|lab2/|):
 
 \begin{minted}{bash}
 	python rom_generator.py src/rom.v sample_data.txt 128 24
 \end{minted}
 
-This will generate a ROM in \verb|lab2/src/rom.v| using the data from \verb|sample_data.txt| with a width of 24 bits and a depth of 128 entries/addresses. Try it out and make sure you understand what the script is doing. Since \verb|sample_data.txt| doesn't contain 128 lines, the undefined memory addresses are filled with zeros.
+This will generate a ROM in \verb|lab2/src/rom.v| using the data from \verb|sample_data.txt| with a width of 24 bits and a depth of 128 entries/addresses. Try it out and make sure you understand what the script is doing. Take a look at \verb|rom.v| and inspect its contents. Since \verb|sample_data.txt| doesn't contain 128 lines, the undefined memory addresses are filled with zeros.
 
 You can edit \verb|sample_data.txt| to fill it with your own melody. We will explore ways of generating a ROM/RAM from an initialization file using Verilog alone in a future lab.\\
 
