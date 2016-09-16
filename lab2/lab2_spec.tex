@@ -48,6 +48,8 @@ In this lab, we will begin by taking your \verb|tone_generator| design from Lab 
 
 \subsection{Copying Your Lab 1 Code}
 
+Run \verb|git pull| in your git cloned \verb|labs_fa16| directory to fetch the latest skeleton files.
+
 Begin by copying your \verb|tone_generator| implementation into the \verb|lab2/tone_generator.v| file. Let's run some simulations on the \verb|tone_generator| in software. To do this, we will need to use a Verilog testbench. A Verilog testbench is designed to test a Verilog module by supplying it with the inputs it needs and testing whether the outputs of the module match what we expect.
 
 
@@ -239,9 +241,16 @@ Inspect the waveform and debug your \verb|tone_generator| if you detect any bugs
 
 I suggest using \url{http://onlinetonegenerator.com/} to generate sample square wave tones and making sure your tones match.\\
 
-Create a testbench that plays some melody and show the TA before proceeding further.
+Create a testbench that plays some simple melody that you define and show the TA before proceeding further.
+
+\section{Try tone\_generator on the FPGA}
+Modify the top-level Verilog module \verb|ml505top.v| to include the new input to the \verb|tone_generator|. You can tie the new input to any value you want.
+
+Run the usual \verb|make| process and then \verb|make impact| to put your new \verb|tone_generator| on the FPGA. It should work as it did before.
 
 \section{Introduction to Inferred Asynchronous Memories}
+
+
 
 \section{Design of the music\_streamer FSM}
 
