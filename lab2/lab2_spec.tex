@@ -34,11 +34,10 @@ Before you proceed with the contents of this lab, we strongly suggest that you l
 
 \end{enumerate}
 
-You should go through the \verb|verilog_fsm.pdf| document before doing the FSM part of this lab. The first couple sections of this lab focus on simulation and it would be valuable to read the first two documents before starting.
+You should go through the \verb|verilog_fsm.pdf| document before doing the last part of this lab. The first couple sections of this lab focus on simulation and it would be valuable to read the first two documents before starting.
 
 \subsection{Helpful Hint: Synthesis Warnings and Errors}
 At various times in this lab, things will just not work on the FPGA or simulation. To help with debugging, you can run \verb|make synth| in the \verb|lab2/| folder. This will just run \verb|xst| which will only take a few seconds. Then you should run \verb|make report|. In the window that opened, click on \verb|Synthesis Messages| on the left under \verb|Errors and Warnings|. Any synthesis warnings you see here are a possible alert to some issue in your circuit. If you don't understand a warning, ask a TA; it almost always reveals some issue in your RTL.
-
 
 \section{Lab Overview}
 
@@ -282,15 +281,40 @@ Use the provided python script to generate a ROM Verilog file:
 	python rom_generator.py rom.v sample_data.txt 128 24
 \end{minted}
 
-This will generate a ROM in \verb|rom.v| using the data from \verb|sample_data.txt| with a width of 24 bits and a depth of 128 entries/addresses. Try it out and make sure you understand what the script is doing. We will explore ways of generating a ROM/RAM from an initialization file using Verilog alone in a future lab.
+This will generate a ROM in \verb|rom.v| using the data from \verb|sample_data.txt| with a width of 24 bits and a depth of 128 entries/addresses. Try it out and make sure you understand what the script is doing. Since \verb|sample_data.txt| doesn't contain 128 lines, the undefined memory addresses are filled with zeros.
+
+You can edit \verb|sample_data.txt| to fill it with your own melody. We will explore ways of generating a ROM/RAM from an initialization file using Verilog alone in a future lab.
 
 \section{Design of the music\_streamer}
-Open up the \verb|music_streamer.v| file. This module will contain an instance of the ROM you created earlier and will address the ROM sequentially to play tones. The output of this module, called \verb|tone| should be fed into the \verb|tone_generator|'s \verb|tone_switch_period| input. Leave the \verb|tempo| and \verb|pause| ports unconnected.\\
+Open up the \verb|music_streamer.v| file. This module will contain an instance of the ROM you created earlier and will address the ROM sequentially to play tones. The \verb|music_streamer| will play each note for a predefined amount of time by sending each switch period defined in the ROM to the \verb|tone_generator|.\\
 
-Begin by instantiating the \verb|music_streamer| module in \verb|ml505top.v|. Connect its \verb|tone| output to the \verb|tone_switch_period| input of the \verb|tone_generator|.
+\textbf{Read this entire section, then... You should calculate what 1/5th of a second is in terms of 33 Mhz clock cycles. Verify with the TA that you got the right answer. Then, before writing any Verilog, draw a schematic of the music\_streamer circuit. Show your circuit to the TA before proceeding.}\\
+
+Let's proceed incrementally to integrate and design the \verb|music_streamer|.
+
+Begin by instantiating the \verb|music_streamer| module in \verb|ml505top.v|. Connect its \verb|tone| output to the \verb|tone_switch_period| input of the \verb|tone_generator|. Connect its \verb|clk| input to the global clock signal. You can leave the \verb|tempo and pause| inputs unconnected for the time being.\\
+
+Now let's begin the design of the \verb|music_streamer| itself. Instantiate your ROM in the \verb|music_streamer| and connect the ROM's address and data ports to wire or reg nets that you create in your module. Next, write the RTL that will increment the address supplied to the ROM every \textbf{1/5th seconds}. The data coming out of the ROM should be fed directly to the \verb|tone_generator|. The ROM's address input should go from 0 to the depth of the ROM and should then loop around back to 0. You don't have a reset signal, so define the initial state of any registers in your design for simulation purposes.
 
 \section{Simulating the music\_streamer}
+To simulate your \verb|music_streamer| add an instance of it to your \verb|tone_generator_testbench|. Wire it up to the \verb|tone_generator| just like you had it in \verb|ml505top.v|. Then make sure you drive \verb|output_enable| to the \verb|tone_generator| to 1 at the start of simulation. Then insert a delay statement to let the simulation run for as long as you desire. Finally run \verb|make| in the \verb|lab2/sim| directory.\\
 
-\section{Adding Tempo Variations and Pausing to the music\_streamer}
+Inspect your waveform to make sure you get what you expect. It will likely be helpful to add a line to the \verb|.do| file in \verb|lab2/sim/tests| so that you can inspect the internal signals of your \verb|music_streamer|. Then, run the Python script to generate a \verb|.wav| file of your simulation results and listen to your \verb|music_streamer| in action.
+
+\section{Verify your Code to Works For Rest Notes}
+In simulation, you can often catch bugs that would be difficult or impossible to catch by running your circuit on the FPGA. You should verify that if your ROM contains an entry that is zero (meaning generate a 0Hz wave), that the \verb|tone_generator| doesn't produce any oscillating output. Verify this in simulation. We will be using this functionality in the next lab when playing sheet music with the \verb|music_streamer|.
+
+\section{Try it on the FPGA!}
+Now try your \verb|music_streamer| on the FPGA. You should expect the output to be the same as in simulation. The GPIO\_DIP switch should still work to disable the output of the \verb|tone_generator|. \textbf{Show your final results, simulation, and the working design on the FPGA to the TA for checkoff.}
+
+\section{Optional: Adding Tempo Variations and Pausing to the music\_streamer}
+In the next lab, we will be making our \verb|music_streamer| more full-featured. If you have time now, you can implement some of these features.\\
+
+Connect a GPIO\_DIP switch to the \verb|pause| input of the \verb|music_streamer|. When this switch is turned on, your module should pause the music at the current note and should cut the output to the piezo speaker. When the switch is turned off, your module should resume playback.
+
+Connect a pair of GPIO\_DIP switches to the \verb|tempo| input of the \verb|music_streamer|. When these switches are toggled, your \verb|music_streamer| should play the notes faster or slower. Basically, you can define four different tempos that hold each note for a different amount of time. We choose a standard 1/5th of a second for this lab, but you can vary it from 1/10, 1/7, 1/5, 1/3 to change tempos of your music on the fly.
+
+\section{Conclusion}
+You are done with lab 2! Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and I welcome everyone's input so that it can be improved.
 
 \end{document}
