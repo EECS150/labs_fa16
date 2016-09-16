@@ -5,5 +5,6 @@ module tone_generator (
 );
 
     reg [23:0] clock_counter;
+    assign square_wave_out = 0;
 
 endmodule
