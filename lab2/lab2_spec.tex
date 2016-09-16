@@ -258,14 +258,14 @@ The synthesizer is a powerful tool that takes the Verilog you write and converts
 module rom (input [2:0] address, output reg [7:0] data);
 	always @(*) begin
 		case(address)
-			3'd0: 8'h00
-			3'd1: 8'hFF
-			3'd2: 8'hAD
-			3'd3: 8'h12
-			3'd4: 8'h37
-			3'd5: 8'h93
-			3'd6: 8'h0A
-			3'd7: 8'hC2
+			3'd0: data = 8'h00;
+			3'd1: data = 8'hFF;
+			3'd2: data = 8'hAD;
+			3'd3: data = 8'h12;
+			3'd4: data = 8'h37;
+			3'd5: data = 8'h93;
+			3'd6: data = 8'h0A;
+			3'd7: data = 8'hC2;
 		endcase
 	end
 endmodule
@@ -275,16 +275,39 @@ To power our \verb|tone_generator|, we will be using a ROM that is X entries/add
 
 To generate a ROM with a script, first begin by creating a file that will define the memory contents with any name you choose. The file should contain a decimal number on each line which represents the data stored at that address. I've provided an example file called \verb|sample_data.txt| in the \verb|lab2/| folder. Each line of this file is the \verb|tone_switch_period| of a single note. The duration of each note will be specified later.
 
-Use the provided python script to generate a ROM Verilog file:
+Use the provided python script to generate a ROM Verilog file (run in \verb|lab2/|):
 
 \begin{minted}{bash}
-	python rom_generator.py rom.v sample_data.txt 128 24
+	python rom_generator.py src/rom.v sample_data.txt 128 24
 \end{minted}
 
-This will generate a ROM in \verb|rom.v| using the data from \verb|sample_data.txt| with a width of 24 bits and a depth of 128 entries/addresses. Try it out and make sure you understand what the script is doing. Since \verb|sample_data.txt| doesn't contain 128 lines, the undefined memory addresses are filled with zeros.
+This will generate a ROM in \verb|lab2/src/rom.v| using the data from \verb|sample_data.txt| with a width of 24 bits and a depth of 128 entries/addresses. Try it out and make sure you understand what the script is doing. Since \verb|sample_data.txt| doesn't contain 128 lines, the undefined memory addresses are filled with zeros.
 
-You can edit \verb|sample_data.txt| to fill it with your own melody. We will explore ways of generating a ROM/RAM from an initialization file using Verilog alone in a future lab.
+You can edit \verb|sample_data.txt| to fill it with your own melody. We will explore ways of generating a ROM/RAM from an initialization file using Verilog alone in a future lab.\\
 
+You might want to try instantiating your memory in \verb|ml505top.v| and putting your design on the FPGA to see how the memory works.
+
+\begin{minted}{verilog}
+module ml505top (
+	input  CLK_33MHZ_FPGA,
+	input  [7:0] GPIO_DIP,
+	output PIEZO_SPEAKER,
+	output [7:0] GPIO_LED
+);    
+	tone_generator piezo_controller (
+		.clk(CLK_33MHZ_FPGA),
+		.output_enable(GPIO_DIP[0]),
+		.square_wave_out(PIEZO_SPEAKER)
+	);
+
+	rom memory (
+		.address(GPIO_DIP[6:0]),
+		.data(GPIO_LED[7:0])
+	);
+endmodule
+\end{minted}
+
+You can toggle the DIP switches and see the 8 LEDs light up with the lowest byte of the data in the address specified by the switches.
 \section{Design of the music\_streamer}
 Open up the \verb|music_streamer.v| file. This module will contain an instance of the ROM you created earlier and will address the ROM sequentially to play tones. The \verb|music_streamer| will play each note for a predefined amount of time by sending each switch period defined in the ROM to the \verb|tone_generator|.\\
 
