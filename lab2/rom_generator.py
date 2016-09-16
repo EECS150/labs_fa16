@@ -23,12 +23,12 @@ verilog_file.write("\t\tcase(address)\n")
 
 for i in range(0, memory_depth):
     if (i >= len(data) or len(data[i]) == 0): # Write a 0
-        verilog_file.write("\t\t\t%d'd%d: %d'd%d\n" % (address_bits, i, data_bits, 0))
+        verilog_file.write("\t\t\t%d'd%d: data = %d'd%d;\n" % (address_bits, i, data_bits, 0))
     else:
-        verilog_file.write("\t\t\t%d'd%d: %d'd%d\n" % (address_bits, i, data_bits, int(data[i])))
+        verilog_file.write("\t\t\t%d'd%d: data = %d'd%d;\n" % (address_bits, i, data_bits, int(data[i])))
 
 verilog_file.write("\t\tendcase\n")
 verilog_file.write("\tend\n")
-verilog_file.write("endmodule")
+verilog_file.write("endmodule\n")
 verilog_file.close()
 
