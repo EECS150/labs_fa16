@@ -86,6 +86,8 @@ python scripts/rom_generator.py src/rom.v music.txt 4096 24
 
 You will now have a \verb|rom.v| file in \verb|lab3/src|. Take a look at this file. The ROM is 4096 entries deep and 24 bits wide with a 12-bit address input. 
 
+You can use any sheet music you want that's available in MusicXML. This website \url{https://musescore.com/} has a lot of good quality sheet music that you can download and play on the FPGA!
+
 \subsection{music\_streamer Modifications}
 
 Make the following changes to the \verb|music_streamer|:
@@ -237,10 +239,36 @@ Make sure that your report gives you \textbf{zero warnings for synthesis.} You m
 Congratulations! You just built three highly useful and practical digital circuits. Now let's integrate them into our larger music streamer design.
 
 \section{Synchronous Resets In Design and Simulation}
+Now that we have a debouncer that can give us a pulse for a press of a button, we have a way of explicitly resetting our circuits! You will recall that in the previous lab, we set the initial value of registers like follows so that our simulation would have defined signals.
+
+\begin{minted}{verilog}
+reg [23:0] clock_counter = 0;
+\end{minted}
+
+Now that we have a reset signal tied to the CPU\_RESET push button, we can do this instead.
+
+\begin{minted}{verilog}
+always @ (posedge clk) begin
+	if (rst) begin
+		clock_counter <= 24'd0;
+	end
+end
+\end{minted}
+
+Unlike what we did before, this RTL is synthesizable for all deployment targets, FPGAs, ASICs, and CPLDs alike. Go ahead and modify your \verb|tone_generator| and \verb|music_streamer| to use the provided reset signal to get your registers to a default state.
+
+After doing this, run the \verb|tone_generator_testbench| again using \verb|make| in the \verb|lab3/sim/| directory. View the waveform using ModelSim and see how we used a reset in the testbench to bring all the registers to a defined state without specifying a default value.\\
+
+Please note that the synchronizer, debouncer, and rotary decoder don't take any reset signals. These circuits should have any registers they use initialized to 0 using the method used in lab 2. This is because these circuits are designed specifically for our FPGA and we are intentionally using our FPGA's initialization capabilities to set their initial states.
 
 \section{Music Streamer Tempo Control}
+Let's begin using the new user inputs we now have a well defined interface to. Start with the \verb|music_streamer|. You will recall that your \verb|music_streamer| by default chooses to play each tone for 1/25th of a second. Extend the functionality so that rotating the rotary encoder changes the tempo of the notes. Pushing in the rotary encoder should reset the tempo back to the default value. You get to choose the amount the tempo changes for each click of the wheel.
+
+Try this out on the FPGA and see that you have control of your \verb|music_streamer|'s tempo using the rotary encoder. You should be able to speed up and slow down the music.
 
 \section{Music Streamer FSM}
+
+
 \section{Conclusion}
 
 \end{document}
