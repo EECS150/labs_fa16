@@ -6,6 +6,8 @@
 \usepackage{verbatim}
 \usepackage{moreverb}
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{automata, positioning}
 \usepackage{minted}
 \let\verbatiminput=\verbatimtabinput
 \def\verbatimtabsize{4\relax}
@@ -19,6 +21,8 @@ TA: Vighnesh Iyer \\Department of Electrical Engineering and Computer Sciences\\
 College of Engineering, University of California, Berkeley}
 \date{}
 \maketitle
+
+\tableofcontents
 
 \section{Before You Start This Lab}
 
@@ -54,7 +58,7 @@ In this lab, we will begin by taking your \verb|tone_generator| and \verb|music_
 
 Run \verb|git pull| in your \textbf{git cloned} \verb|labs_fa16| directory to \textbf{fetch the latest skeleton files for this lab.}
 
-\section{Overview of Your Tone\_generator and Music\_streamer}
+\section{Overview of Your tone\_generator and music\_streamer}
 
 \begin{center}
 \includegraphics[height=5cm]{images/lab2_fig1.png}
@@ -262,20 +266,87 @@ After doing this, run the \verb|tone_generator_testbench| again using \verb|make
 Please note that the synchronizer, debouncer, and rotary decoder don't take any reset signals. These circuits should have any registers they use initialized to 0 using the method used in lab 2. This is because these circuits are designed specifically for our FPGA and we are intentionally using our FPGA's initialization capabilities to set their initial states.
 
 \section{Music Streamer Tempo Control}
-Let's begin using the new user inputs we now have a well defined interface to. Start with the \verb|music_streamer|. You will recall that your \verb|music_streamer| by default chooses to play each tone for 1/25th of a second. Extend the functionality so that rotating the rotary encoder changes the tempo of the notes. Pushing in the rotary encoder should reset the tempo back to the default value. You get to choose the amount the tempo changes for each click of the wheel.
+Let's begin using the new user inputs we now have a well defined interface to. Start with the \verb|music_streamer|. You will recall that your \verb|music_streamer| by default chooses to play each tone in the ROM for 1/25th of a second. Extend the functionality of the \verb|music_streamer| so that spinning the rotary encoder changes the tempo of the notes. Pushing in the rotary encoder should reset the tempo back to the default value. You get to choose the amount the tempo changes for each click of the wheel.
 
-Try this out on the FPGA and see that you have control of your \verb|music_streamer|'s tempo using the rotary encoder. You should be able to speed up and slow down the music.
+Try this out on the FPGA and verify that you have control of your \verb|music_streamer|'s tempo using the rotary encoder. You should be able to speed up and slow down the music you are playing.
 
 \section{Music Streamer FSM}
 To wrap up this lab, you will implement a simple FSM in the \verb|music_streamer|. The FSM will have 3 states: PAUSED, REGULAR\_PLAY, REVERSE\_PLAY. Here is the state transition diagram:
 
-% ATTACH FSM DIAGRAM HERE
+\begin{center}
+\begin{tikzpicture}[shorten >=1pt, node distance=10cm,on grid, auto]
+  \tikzstyle{state} = [draw, very thick, fill=white, rectangle, minimum height=3em, minimum width=7em, node distance=12em, font={\sffamily\bfseries}]
+  \tikzstyle{stateEdgePortion} = [black,thick];
+  \tikzstyle{stateEdge} = [stateEdgePortion,->];
+  \tikzstyle{edgeLabel} = [pos=0.5, text centered, font={\sffamily\small}];
+  
+	\node[state,initial](rp) {REGULAR\_PLAY};
+	\node[state](revp) [below left=of rp]{REVERSE\_PLAY};
+	\node[state](p) [below right=of rp]{PAUSED};
+
+	\path[->]
+	(rp) edge node {Center button} (p)
+		edge [swap] node {North button} (revp)
+		edge [loop above] node {} (rp)
+	(p) edge node {} (rp)
+		edge [loop below] node {} (p)
+	(revp) edge node {Center button} (p)
+		edge [swap] node {} (rp)
+		edge [loop below] node {} (revp);
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+	\item Your initial state should be \verb|REGULAR_PLAY|. 
+	
+	\item Pressing the center compass push button should transition you into the \verb|PAUSED| state from either the \verb|REGULAR_PLAY| or \verb|REVERSE_PLAY| states. Pressing the center compass push button while in the \verb|PAUSED| state should transition the FSM to the \verb|REGULAR_PLAY| state.
+	
+	\item In the \verb|PAUSED| state, your ROM address should be held steady at its value before the transition into \verb|PAUSED| and no sound should come out of the piezo speaker. After leaving the \verb|PAUSED| state your ROM address should begin incrementing again from where it left off and the speaker should play the tones.
+	
+	\item You can toggle between the \verb|REGULAR_PLAY| and \verb|REVERSE_PLAY| states by using the north compass button. In the \verb|REVERSE_PLAY| state you should decrement your ROM address by 1 rather than incrementing it by 1 every X clock cycles as defined by your tempo.
+	
+	\item If you don't press any buttons, the FSM shouldn't transition to another state. Also, the rotary encoder wheel can be used to change tempo regardless of which state you are in.
+\end{enumerate}
 
 Your \verb|music_streamer| takes in 2 user button inputs that it can use to transition states. You should drive the compass LEDs in this fashion corresponding to the three states:
 
-% SPECIFY HOW LEDs SHOULD BE DRIVEN TO DISPLAY STATE
+\renewcommand{\arraystretch}{1.5}
+\begin{center}
+\begin{tabular}{| l | l |}
+	\hline
+	\textbf{LED} & \textbf{Value} \\ \hline
+	Center & \verb|current_state| == \verb|PAUSED| \\ \hline
+	North & \verb|current_state| == \verb|REGULAR_PLAY| \\ \hline
+	South & \verb|current_state| == \verb|REVERSE_PLAY| \\ \hline
+	East & 0 \\ \hline
+	West & 0 \\ \hline
+\end{tabular}
+\end{center}
 
-\section{Conclusion}
-You are done with lab 3! This was the most challenging lab so far, but we hoped you learned a lot. All of this knowledge and experience will be useful for the project. Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.
+Put your design on the FPGA with \verb|make| and \verb|make impact| and try transitioning states. For checkoff be able to demonstrate your state machine working and the tempo control with the rotary encoder.
+
+\section{Conclusion + Checkoff}
+You are done with lab 3! This was the most challenging lab so far, but we hoped you learned a lot. All of this knowledge and experience will be useful for the project. Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.\\
+
+\subsection{Checkoff Tasks}
+
+\begin{enumerate}
+	\item Show the TA your working design with the FSM. Be able to transition states by clicking on the north and center buttons and show that your \verb|music_streamer| matches the spec.
+	
+	\item Show the tempo control working by spinning the rotary encoder to speed up and slow down the music.
+	
+	\item Demonstrate that hitting the \verb|CPU_RESET| button resets the ROM address back to 0 and puts the FSM into the \verb|REGULAR_PLAY| state.
+	
+	\item Show the TA your Verilog RTL for all the components you designed for this lab (synchronizer, debouncer, rotary decoder, FSM) and briefly explain the design of each of them.
+\end{enumerate}
+
+\section{Optional: Use Rotary Encoder for Pitch Adjustment}
+This section is optional. It will give you more practice with FSMs and will extend the functionality of your \verb|music_streamer|.\\
+
+Instead of pushing the rotary encoder to reset the tempo, have another compass button perform the tempo reset. Then, use the push of the rotary encoder to toggle between having the rotary encoder control tempo and pitch. By default the rotary encoder can control tempo, but pushing it can allow it to control the pitch of the tones being played as well.
+
+Modify your \verb|music_streamer| such that the rotary encoder can control the pitch of the tones by having it control a \textbf{signed} register. This register's should be added to the ROM's data output to change its pitch before passing the tone to the \verb|tone_generator|. You get to choose how much each click of the wheel will change the pitch of the tone being played.
+
+You should route the current state of the rotary encoder (\verb|TEMPO_CONTROL| or \verb|PITCH_CONTROL|) to a compass LED. Demonstrate your rotary encoder being used to control tempo and pitch.
 
 \end{document}
