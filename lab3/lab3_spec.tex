@@ -145,23 +145,61 @@ You will notice that when pressing certain buttons, the LED flickers on and off 
 
 \subsection{Debouncer}
 
-For this lab, the debouncer circuit will basically take the signal from when you press a button on the FPGA and convert it into a digital signal. The reason we need a somewhat involved circuit for this is shown in the figure below.
+For this lab, the debouncer circuit will take a button's digital input and output a single pulse indicating a single button press. The reason we need a somewhat involved circuit for this is shown in the figure below.
 
 \begin{center}
 \includegraphics[height=5cm]{images/lab2_fig4.png}
 \end{center}
 
-When we press the button, we don't get a perfect stable signal. It "bounces" but we want a solid signal so we will use the circuit showed previously.
+When we press the button, we don't get a perfect stable signal. Instead the button signal has a mechanical 'bounce'. A debouncer turns this waveform, which shows a single button press, into a single pulse that our circuit can use.
 
-The one bit debouncer circuit we want you to implement consists of three main parts:
+Take a look at \verb|lab3/src/debouncer.v|. This is a parameterized debouncer which can debounce \verb|width| signals at a time. Your debouncer receives a vector of synchronized 1-bit signals and it outputs a debounced version of those signals. The other parameters reference the constants used in the circuit from the prelab reading.
 
-- the synchronizer which in our case will be outputting the digital signal of the buttons on our FPGA board being pressed
+The debouncer consists of:
 
-- the sample pulse generator which tells our main circuit to check the synchronizer output signal every n cycles by using a counter and telling the main circuit to sample every time the counter hits max and resets the counter
+\begin{enumerate}
+	\item \textbf{Sample Pulse Generator} - Tells our main debouncer counter when to sample the input signal. It should output a 1, every \verb|sampling_pulse_period| clock cycles. By default \verb|sampling_pulse_period| is set to 25000.
+	
+	\item \textbf{Saturating Counter} - This is a counter that counts up to \verb|saturating_counter_max|. Every time the sample pulse generator tells the saturating counter to sample the input signal, it should either count up by 1 if the input signal is high, or it should reset to zero if the input signal is low. When the saturating counter reaches the value of \verb|saturating_counter_max|, by default set to 120, it should output a pulse that's one clock period wide. (i.e. the saturating counter should reset to zero the cycle after the counter reaches \verb|saturating_counter_max|. This isn't shown in the circuit diagram.)
+\end{enumerate}
 
-- the debouncer which works very similarly to the the sample pulse generator. Every time the sample pulse generator tells this debouncer to sample and our synchronizer output was high, that means the button was held for that sample. Once we reach a certain number of logical high sample values, we established that the button was pushed. You might get the impression the button has to be pressed relatively longer for all the circuitry to realize it has been pressed, but considering how fast the clock is, you normally pushing the button should be enough time if you didn't make the counter values unreasonable large.
+You will likely need to use 2D regs in Verilog to implement a saturating counter for each input signal to debounce. You will also likely need to use generate-for. You can use the same sample pulse generator for all input signals.
 
-We'll want you to make a debouncer circuit for 7 buttons: the 5 cross oriented buttons on the board, the reset button, and the rotary encoder also acts as a button.
+As an example:
+
+\begin{minted}{verilog}
+reg [7:0] arr [0:3]; // 4 x 8 bit array
+arr[0]; // First byte from arr (8 bits)
+arr[1][2]; // Third bit of 2nd byte from arr (1 bit)
+
+genvar i;
+generate
+	for (i = 0; i < width; i = i + 1):LOOP_NAME begin
+		// Insert Verilog here
+		always @ (posedge clk) begin
+			// Stuff
+		end
+	end
+endgenerate
+\end{minted}
+
+\subsubsection{Testing in Simulation}
+There is no staff created testbench for this module, but you are welcome to create your own. Instantiate your debouncer and synchronizer module and feed it a simulated button press. First start the button off low, then after x ns make it high and oscillate it a bit before settling at high in your initial block. Run your simulation for a second or so and see how your debouncer module behaves. You will have to write your own testbench file and your own .do file to be placed in \verb|lab3/sim/tests| for this testbench.
+
+\subsubsection{Testing on the FPGA}
+We have created a top level module called \verb|debouncer_fpga_test| that will create a 8-bit register and will use button presses to add and subtract from it. Pressing any button will cause the counter to increment and the LEDs will show the current value of the counter. Pressing the South compass button however, will cause the counter to decrement. 
+
+\begin{minted}[frame=single]{bash}
+make TOP=debouncer_fpga_test
+make TOP=debouncer_fpga_test report
+make TOP=debouncer_fpga_test impact
+\end{minted} 
+
+Make sure that your report gives you \textbf{zero warnings for synthesis.} You must fix any and all warnings before your debouncer will work well on the FPGA.\\
+
+\textbf{Show the TA the debouncer working before moving on. It is critical that your debouncer works properly.}
+
+You will discover when playing with your debouncer that the buttons have a way that they like being pressed to minimize bounce; get a good feel for them. You can try holding down a button to see how your debouncer will only output pulses at a regular interval. You can try changing the debouncer parameters to see how they affect the debouncer's performance.
 
 \subsection{Rotary Encoder}
 
