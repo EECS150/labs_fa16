@@ -119,7 +119,7 @@ Recall this graphic from the prelab debouncer reading. It is an overview of the 
 In RTL, digital signals can be interpreted as 0's and 1's. However, in reality these correspond to low and high voltages and there are other states that can occur. In the lab we have to be concerned about the metastable state.
 
 \begin{center}
-\includegraphics[width=\textwidth]{images/lab2_fig3.png}
+\includegraphics[height=3cm]{images/lab2_fig3.png}
 \end{center}
 
 Normally, when there are no timing issues, we only have to worry about the high and low states. However, if there are timing issues, we can run into metastability where a net is basically stuck between the two states. This is an oversimplification but what you ultimately need to know is that metastability is generally undesirable and we want a circuit to get rid of it. \\
@@ -203,16 +203,44 @@ You will discover when playing with your debouncer that the buttons have a way t
 
 \subsection{Rotary Encoder}
 
-The rotary encoder consists of circuit that basically has two switches that go high as you rotate the wheel. 
-
-\includegraphics[width=\textwidth]{images/lab2_fig5.png}
-
-Our main concern is finding out which direction the wheel turned. The following figure illustrates how we will do so. Basically, if the pulse from A happens before the pulse from B, it indicates that a the wheel has been a certain way and if the wheel is spun in the opposite direction then B's pulse will occur before A. We will take advantage of the fact that we will have two different rising edges to find the direction the wheel was turned.
+The rotary encoder consists of a circuit that has two switches that go high as you rotate the wheel. Recall this waveform from the prelab reading.
 
 \begin{center}
-\includegraphics[height=5cm]{images/lab2_fig6.png}
+\includegraphics[height=5cm]{images/lab2_fig5.png}
 \end{center}
 
+Our main concern is finding out which direction the wheel turned. The following oscilloscope waveform from the prelab reading illustrates how we will do so. 
+
+\begin{center}
+	\includegraphics[height=5cm]{images/lab2_fig6.png}
+\end{center}
+
+If the pulse from A (top wave - orange) happens before the pulse from B (bottom wave - blue), it indicates that a the wheel has been turned a certain way. If the wheel is spun in the opposite direction then B's pulse will occur before A. We will take advantage of the fact that we can examine the logic level of wave B at the rising edge of wave A to determine direction of wheel movement.
+
+Open up \verb|lab3/src/rotary_decoder.v|. This module takes the synchronized A and B signals, and a clock input. It outputs \verb|rotary_event| when a wheel click has been detected and \verb|rotary_left| indicates whether that spin was to the right or the left.\\
+
+Begin by implementing the Rotary Contact Filter as described in slide 7 of the prelab reading. This is a simple filter to remove glitching from the A and B signals. After implementing the filter, refer to slide 8 of the prelab reading for the circuit that will produce the \verb|rotary_event| and \verb|rotary_left| outputs.
+
+\subsubsection{Testing}
+As with the debouncer, there isn't a staff provided testbench, but you may write one yourself. There is a test top level module called \verb|rotary_decoder_fpga_test|. It allows you to spin the rotary encoder to increment and decrement a 8-bit counter whole value is shown on the GPIO LEDs. Pushing the rotary encoder button will cause the counter to reset it to 0. Run it as such.
+
+\begin{minted}[frame=single]{bash}
+make TOP=rotary_decoder_fpga_test
+make TOP=rotary_decoder_fpga_test report
+make TOP=rotary_decoder_fpga_test impact
+\end{minted} 
+
+Make sure that your report gives you \textbf{zero warnings for synthesis.} You must fix any and all warnings before your rotary encoder will work well on the FPGA.\\
+
+\textbf{Show the TA the rotary encoder working before moving on. It is critical that your rotary encoder works properly.}
+
+Congratulations! You just built three highly useful and practical digital circuits. Now let's integrate them into our larger music streamer design.
+
+\section{Synchronous Resets In Design and Simulation}
+
+\section{Music Streamer Tempo Control}
+
+\section{Music Streamer FSM}
 \section{Conclusion}
 
 \end{document}
