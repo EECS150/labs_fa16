@@ -430,21 +430,46 @@ You can run the testbench in \verb|lab4/src/tone_generator_testbench.v| to test 
 
 Put your design on the FPGA with \verb|make| and \verb|make impact| and try transitioning states. For checkoff be able to demonstrate your state machine working and the tempo control with the rotary encoder.
 
-\subsection{Synchronous RAM}
-
 \section{Building a Music Sequencer FSM}
 
-A simple explanation of what we want you to do for the sequencer is to add one more functionality to your FPGA in which you will actually be able to make your own simple tune. You will have 8 memory locations which you can write to. To make the tune, you should have two states, an edit and play state. 
+Here is a new state transition diagram for our music sequencer we will build inside the \verb|music_streamer| module.
 
-In the edit state, you start off at the first memory location and you should be able to adjust the tone you want to save. You adjust the tone by turning the wheel and you save pressing the wheel button. You can move to the next memory location by pressing the east or west compass buttons. HOWEVER, note that if you want to save the tone, you must remember to press the wheel button before moving to a different memory address. You should be playing the tones while editing so you can hear the tone that you are saving. 
+\begin{center}
+	\begin{tikzpicture}[shorten >=1pt, node distance=10cm,on grid, auto]
+	\tikzstyle{state} = [draw, very thick, fill=white, rectangle, minimum height=3em, minimum width=7em, node distance=12em, font={\sffamily\bfseries}]
+	\tikzstyle{stateEdgePortion} = [black,thick];
+	\tikzstyle{stateEdge} = [stateEdgePortion,->];
+	\tikzstyle{edgeLabel} = [pos=0.5, text centered, font={\sffamily\small}];
+	
+	\node[state,initial](rp) {REGULAR\_PLAY};
+	\node[state](revp) [below =of rp]{REVERSE\_PLAY};
+	\node[state](p) [right=of rp]{PAUSED};
+	\node[state](playseq) [above=of rp]{PLAY\_SEQ};
+	\node[state](editseq) [left=of rp]{EDIT\_SEQ};
+	
+	\path[->]
+	(playseq) edge node [swap] {Center} (p)
+		edge node [swap] {West} (editseq)
+		edge node {} (rp)
+	(editseq) edge node {} (playseq)
+	(rp) edge node {Center} (p)
+		edge [swap] node {South} (revp)
+		edge node {North} (playseq)
+	(p) edge node {} (rp)
+		edge [bend right, swap] node {North} (playseq)
+	(revp) edge [swap] node {Center} (p)
+		edge [swap] node {} (rp);
+	\end{tikzpicture}
+\end{center}
 
-In the play state, you should be looping through the 8 frequencies. A reset should return the tones in all memory location to some initial value.
+We have added two new states \verb|PLAY_SEQ| and \verb|EDIT_SEQ|. You should wire up the west compass LED to \verb|current_state == EDIT_SEQ| and the north compass LED to \verb|current_state == PLAY_SEQ|. You should implement the skeleton of this state machine before proceeding with the complete explanation.\\
 
-\section{Putting Everything Together}  
-One final task will be to combine the sequencer into your existing FSM. This means aside from the regular, pause, and reverse states, you will have one more state which is the \verb|SEQUENCER| state. Within the \verb|SEQUENCER| state, you should have the behavior described earlier. You should design the transitions such that if you press the north compass button, the \verb|REGULAR_PLAY| state should move into the \verb|SEQUENCER| state and pressing the north button again in the \verb|SEQUENCER| state should take you back to the \verb|REGULAR_PLAY| state. 
+Our goal is to create an 8-tap music sequencer that we can use along with our regular music streamer. Our music sequencer will have a place (RAM) where it stores the \verb|tone_switch_period|s of 8 notes. When we are in the \verb|PLAY_SEQ| state, the music streamer will play the 8 notes, one after the other, in a continuous loop. Each note will play for a set amount of time as determined by the \textbf{sequencer tempo}.
+
+We can edit these 8 notes on the fly by moving into the \verb|EDIT_SEQ| state. In this state, the LEDs will show which of the 8 notes we are currently editing. By spinning the rotary encoder, we can select a new pitch for this note. By clicking in the rotary encoder, we can save the selected pitch in the RAM location for this note. We can use the east and west buttons to edit a different note.
 
 \section{Conclusion + Checkoff}
-You are done with lab 4! This was the most challenging lab so far, but we hoped you learned a lot. All of this knowledge and experience will be useful for the project. Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.\\
+You are done with lab 4! Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.\\
 
 \subsection{Checkoff Tasks}
 
