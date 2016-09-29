@@ -7,7 +7,7 @@
 \usepackage{moreverb}
 \usepackage{graphicx}
 \usepackage{tikz}
-\usetikzlibrary{automata, positioning}
+\usetikzlibrary{arrows,automata, positioning}
 \usepackage{minted}
 \let\verbatiminput=\verbatimtabinput
 \def\verbatimtabsize{4\relax}
@@ -435,7 +435,7 @@ Put your design on the FPGA with \verb|make| and \verb|make impact| and try tran
 Here is a new state transition diagram for our music sequencer we will build inside the \verb|music_streamer| module.
 
 \begin{center}
-	\begin{tikzpicture}[shorten >=1pt, node distance=10cm,on grid, auto]
+	\begin{tikzpicture}[shorten >=1pt, node distance=10cm,on grid, auto, semithick]
 	\tikzstyle{state} = [draw, very thick, fill=white, rectangle, minimum height=3em, minimum width=7em, node distance=12em, font={\sffamily\bfseries}]
 	\tikzstyle{stateEdgePortion} = [black,thick];
 	\tikzstyle{stateEdge} = [stateEdgePortion,->];
@@ -464,9 +464,40 @@ Here is a new state transition diagram for our music sequencer we will build ins
 
 We have added two new states \verb|PLAY_SEQ| and \verb|EDIT_SEQ|. You should wire up the west compass LED to \verb|current_state == EDIT_SEQ| and the north compass LED to \verb|current_state == PLAY_SEQ|. You should implement the skeleton of this state machine before proceeding with the complete explanation.\\
 
-Our goal is to create an 8-tap music sequencer that we can use along with our regular music streamer. Our music sequencer will have a place (RAM) where it stores the \verb|tone_switch_period|s of 8 notes. When we are in the \verb|PLAY_SEQ| state, the music streamer will play the 8 notes, one after the other, in a continuous loop. Each note will play for a set amount of time as determined by the \textbf{sequencer tempo}.
+Our goal is to create an 8-tap music sequencer that we can use along with our regular music streamer. Our music sequencer will have a place (RAM) where it stores the \verb|tone_switch_period|s of 8 notes. When we are in the \verb|PLAY_SEQ| state, the music streamer will play the 8 notes, one after the other, in a continuous loop. Each note will play for a set amount of time as determined by the \textbf{sequencer tempo}. While in the \verb|PLAY_SEQ| state we can change the sequencer tempo using the rotary encoder (\textbf{the sequencer tempo is different from the ROM tempo you modified earlier})
 
-We can edit these 8 notes on the fly by moving into the \verb|EDIT_SEQ| state. In this state, the LEDs will show which of the 8 notes we are currently editing. By spinning the rotary encoder, we can select a new pitch for this note. By clicking in the rotary encoder, we can save the selected pitch in the RAM location for this note. We can use the east and west buttons to edit a different note.
+We can edit these 8 notes on the fly by moving into the \verb|EDIT_SEQ| state. In this state, the LEDs will show which of the 8 notes we are currently editing. By spinning the rotary encoder, we can select a new pitch for this note. By clicking in the rotary encoder, we can save the selected pitch in the RAM location for this note. We can use the east and west buttons to edit a different note.\\
+
+You will find some skeleton code in \verb|lab4/src/music_streamer.v| to help you implement the sequencer. This is a complicated circuit, so you should add features slowly and modify the \verb|tone_generator_testbench| to test out your sequencer. Here is a list of requirements for your sequencer:
+
+\begin{enumerate}
+	\item You should have two tempo controls. 
+	
+	\begin{enumerate}
+		\item The \textbf{ROM tempo} affects the duration of each note in the ROM and can be modified in either the \verb|REGULAR_PLAY| or \verb|REVERSE_PLAY| states by the rotary encoder.
+		\item The \textbf{sequencer/RAM tempo} affect the duration of each note in the sequencer RAM and can be modified only in the \verb|PLAY_SEQ| state by the rotary encoder.
+	\end{enumerate}
+	
+	\item The GPIO leds should be used for the following functions in different states.
+	
+	\begin{enumerate}
+		\item In the \verb|REGULAR_PLAY|, \verb|PAUSED|, and \verb|REVERSE_PLAY| states, the 8 GPIO LEDs should display the top 8 bits of the ROM address.
+		\item In the \verb|PLAY_SEQ| state, the 8 GPIO LEDs should display the note being played. For example, if note 5 is currently being played, LED 5 should be on and the rest off.
+		\item In the \verb|EDIT_SEQ| state, the 8 GPIO LEDs should display the note being edited. For example, if we are editing note 6, LED 6 should be on and the rest off.
+	\end{enumerate}
+	
+	\item In the \verb|EDIT_SEQ| state, the piezo speaker should play the current pitch of the note. Spinning the rotary encoder should increase and decrease the pitch by some amount per click that you determine. Pressing the rotary encoder button should save the current pitch of the note into the sequencer's RAM.
+	
+	\item In the \verb|EDIT_SEQ| state, pressing the east or west buttons should change the note being edited. As you change notes, the piezo speaker should play the pitch of the new note being edited.
+	
+	\item You can use the same \verb|clock_counter| for all parts of this state machine including the sequencer and the regular music streamer.
+	
+	\item You can use the same \verb|sequencer_address| for the two sequencer states.
+	
+	\item You can choose what the reset values for the sequencer RAM entries are. A sensible default is provided in the skeleton code.
+\end{enumerate}
+
+Please ask the TA if you have any questions about specifications for the sequencer or FSM in general.
 
 \section{Conclusion + Checkoff}
 You are done with lab 4! Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.\\
