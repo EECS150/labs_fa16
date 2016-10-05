@@ -56,9 +56,9 @@ Let us first think about sending a character using this scheme. Once we have a c
 Remember, the serial baudrate is much slower than the system clock, so we must wait $SymbolEdgeTime = \frac{ClockFreq}{BaudRate}$ cycles between changing the character we're putting on the serial line. After we have shifted all 10 bits out of the shift register, we are done unless we see another transmission immediately after.
 
 \subsection{Receiving}
-The receive side is a bit more complicated. Like the transmit side, the receive side of the serial device is essentially just a shift register, but this time we are shifting bits from the serial line into the shift register.
+The receive side is a bit more complicated. Fortunately, we will provide the receiver module. Open \verb|lab6/src/UAReceive.v| so you can see the explanation below implemented. 
 
-However, care must be taken into determining when to shift bits in. If we attempt to sample the serial signal directly on the edge between two symbols, we are exceedingly likely to sample on the wrong side of the edge (or worse, when the signal is transitioning) and get the wrong value for that bit. The correct solution is to wait halfway into a cycle (until \verb|SampleTime| on the diagram) before reading a bit in to the shift register.
+Like the transmit side, the receive side of the serial device is essentially just a shift register, but this time we are shifting bits from the serial line into the shift register. However, care must be taken into determining when to shift bits in. If we attempt to sample the serial signal directly on the edge between two symbols, we are exceedingly likely to sample on the wrong side of the edge (or worse, when the signal is transitioning) and get the wrong value for that bit. The correct solution is to wait halfway into a cycle (until \verb|SampleTime| on the diagram) before reading a bit in to the shift register.
 
 One other subtlety of the receive side is correctly implementing the ready/valid interface. Once we have receive a full character over the serial port, we want to hold the valid signal high until the ready signal goes high, after which the valid signal should be low until we receive another character. 
 
@@ -92,5 +92,8 @@ To close \verb|screen|, type \verb|Ctrl-a| then \verb|Shift-k| and answer \verb|
 
 \subsection{Checkoff}
 Show your TA that you can successfully type characters on the keyboard and have them echoed back to display on your \verb|screen| session. Additionally, please follow the instructions below to commit your working \verb|UATransmit| code to your group's Github repo.
+
+\section{Extra}
+If you have time you can try to integrate the tone generator and the UART. Take what you've learn in the previous labs to add the another state to your already existing state machine. In this new state, you should be able to press a key and instead of just printing out a letter, you should be able to play a tune as well. You can use a simple scheme when matching key inputs to a tone; there is no need to make anything too complicated. 
 
 \end{document}
