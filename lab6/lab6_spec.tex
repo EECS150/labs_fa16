@@ -29,49 +29,36 @@ College of Engineering, University of California, Berkeley}
 
 \section{Before You Start This Lab}
 
-Before you proceed with the contents of this lab, we suggest that you review the three documents that will help you better understand some concepts we will be covering.
+These documents will be helpful as you work through this lab.
 
 \begin{enumerate}
-	\item \textbf{labs\_fa16/docs/Verilog/verilog\_fsm.pdf}
+	\item \textbf{labs\_fa16/docs/AC97\_Spec.pdf}
 	
-	Goes over concepts of FSM in Verilog. Provides an example of  implementing FSM's in Verilog and pitfalls to watch out for.
+	The official specification of the AC97 protocol which you will partially implement in this lab. This is a large document but there are only a few sections that are important to us. They will be referenced later in the spec.
 	
-	\item \url{http://www.labbookpages.co.uk/electronics/debounce.html}
+	\item \textbf{labs\_fa16/docs/AD1981B\_Datasheet.pdf}
 	
-	Read the "What is Switch Bounce" section to get idea of why we need a debouncer circuit. Read the "Digital Switch Debouncing" section to get a general overview of the circuit, its parts, and their purposes. You may want to pay attention to the purpose of the synchronizer as meta-stability is something you will go over in class.
-	
-	\item \url{http://www.xilinx.com/products/boards/s3estarter/files/s3esk_rotary_encoder_interface.pdf}
-	
-	Read slide 5 (Rotary Encoder and Signals) to get an idea of how the encoder works and the signal it generates. You can read the next few pages to get a better idea of how to use the signals. You will be implementing the circuit described in these slides in this lab.
-
+	The datasheet of the AD1981B AC97 Audio Codec. We will be writing a controller that lives on the FPGA which will communicate with this IC using the AC97 protocol. This IC receives audio data over the AC97 protocol and converts the digital audio data to an analog signal which is sent through the headphone jack.
 \end{enumerate}
 
-In the first couple sections of this lab, we will be revisiting the circuits you did in lab 3. Some need to be changed such as the debouncer but others such as the synchronizer do not need changes. \textbf{When we ask you to copy your Verilog from a previous lab, please don't copy over the entire file, but just copy and paste the code you wrote inside your module.} Some of the port declarations for various modules will have changed from previous labs.
-
+\textbf{We strongly recommend you read through this entire document before coming to lab.}
 
 \section{Lab Overview}
-
-
 Run \verb|git pull| in your \textbf{git cloned} \verb|labs_fa16| directory to \textbf{fetch the latest skeleton files for this lab.}
-\section{AC97 Controller - Checkpoint 2}
 
-In checkpoint two of the project you will be implementing an AC97 audio controller that allows your processor to send linear PCM samples to the AC97 codec (IC) on the board. \\
+In this lab, we will create a AC97 controller that lives on the FPGA. The controller will interact with an AC97 audio codec IC on the ML505 development board. Your controller will implement a portion of the AC97 protocol that will allow it to send digital audio data and control signals to the IC.
 
-Our goal for this checkpoint is to enable our processor to synthesize or load a time domain audio waveform, and then send digital samples of that waveform out of the FPGA to the audio codec on the board. The audio codec contains digital to analog converters and filters inside which take the discrete digital audio samples and convert them to a continuous waveform. Then, the waveform is transmitted by the codec to the headphone jack on the back of the board. You should be able to then plug in a pair of headphones and hear the audio signal that your processor synthesized. \\
+\section{Introduction to the AC97 Protocol}
+AC97 is a protocol which is used for communication between a source/producer of audio data and an audio codec. The audio codec present on the FPGA development board (ML505) is the Analog Devices AD1981B Codec. Our processor will send digital packets to this codec using the AC97 protocol.
 
-At the end of this checkpoint, you will have your AC97 controller accessible through memory mapped IO, similar to how your UART is accessed. Once you have this checkpoint's modules working, you will be able to load a program onto your processor which allows you to use your keyboard as a piano. The program synthesizes sine waves of various frequencies based on what key you are pressing and will transmit the wave to the codec so you can hear the music you play through your headphones.
+Refer to the AD1981B Codec datasheet and the official AC97 spec when working through this lab. They are in the \verb|labs_fa16/docs| folder.
 
-\subsection{Introduction to the AC97 Protocol}
-AC97 is a protocol which is used for communication between a producer of audio data and an audio codec. The audio codec present on the FPGA development board (ML505) is the Analog Devices AD1981B Codec. Our processor will send digital packets to this codec using the AC97 protocol. \\
-
-For reference, here is the AD1981B Codec datasheet: \href{http://www.xilinx.com/products/boards/ml505/datasheets/87560554AD1981B_c.pdf}{AD1981B Datasheet}, and here is the official AC97 spec: \href{http://download.intel.com/support/motherboards/desktop/sb/ac97_r23.pdf}{AC97 Spec}. You might have to refer to these as you go about implementing your controller. \\
-
-\subsubsection{Protocol Connections}
+\subsection{Protocol Connections}
 
 \begin{figure}[hbt]
 	\begin{center}
 		\includegraphics[width=6in]{ac97_connections}
-		\caption{Codec to Controller Connections}
+		\caption{Codec - Controller Connections}
 	\end{center}
 \end{figure}
 
@@ -87,7 +74,7 @@ There are 5 wires involved in the AC97 protocol. They are
 
 The way in which your controller transmits audio samples (linear PCM) to the codec is through the SDATA\_OUT wire. There is a specific method of framing the samples so that the codec knows how to read them which is defined by the AC97 spec. \\
 
-\subsubsection{How Data is Transmitted}
+\subsection{How Data is Transmitted}
 AC97 is a serial interface: data is transmitted to and from the codec one bit at a time. On every cycle of the AC97 bit clock (BIT\_CLK), one bit of data is transfered from the AC97 controller (on the FPGA) to the codec over the SDATA\_OUT wire, and one bit of data is transfered from the codec to the FPGA over the SDATA\_IN wire. \\
 
 The constant streams of data passing between the codec and the FPGA are divided into frames. The bit clock is generated by the codec, and runs at 12.288MHz. There are 256 bits per frame, so 48,000 frames are sent per second. This is where the 48kHz sampling rate of the codec comes from. Each frame sent to the codec provides one 20-bit sample for each of the DACs in the codec, and each frame sent by the codec provides one 20-bit sample from each of the codec's ADCs. \\
