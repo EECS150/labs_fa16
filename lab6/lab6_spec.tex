@@ -1,0 +1,260 @@
+\documentclass[11pt]{article}
+
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{fullpage}
+\usepackage{verbatim}
+\usepackage{moreverb}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows,automata, positioning}
+\usepackage{minted}
+\let\verbatiminput=\verbatimtabinput
+\def\verbatimtabsize{4\relax}
+\graphicspath{{images/}}
+
+\begin{document}
+\title{EECS 151/251A FPGA Lab\\
+Lab 6: AC97 (Audio) Controller and FPGA - IC Communication}
+
+\author{Prof. Borivoje Nikolic \\
+TA: Vighnesh Iyer \\Department of Electrical Engineering and Computer Sciences\\
+College of Engineering, University of California, Berkeley}
+\date{}
+\maketitle
+
+\tableofcontents
+
+\section{Before You Start This Lab}
+
+Before you proceed with the contents of this lab, we suggest that you review the three documents that will help you better understand some concepts we will be covering.
+
+\begin{enumerate}
+	\item \textbf{labs\_fa16/docs/Verilog/verilog\_fsm.pdf}
+	
+	Goes over concepts of FSM in Verilog. Provides an example of  implementing FSM's in Verilog and pitfalls to watch out for.
+	
+	\item \url{http://www.labbookpages.co.uk/electronics/debounce.html}
+	
+	Read the "What is Switch Bounce" section to get idea of why we need a debouncer circuit. Read the "Digital Switch Debouncing" section to get a general overview of the circuit, its parts, and their purposes. You may want to pay attention to the purpose of the synchronizer as meta-stability is something you will go over in class.
+	
+	\item \url{http://www.xilinx.com/products/boards/s3estarter/files/s3esk_rotary_encoder_interface.pdf}
+	
+	Read slide 5 (Rotary Encoder and Signals) to get an idea of how the encoder works and the signal it generates. You can read the next few pages to get a better idea of how to use the signals. You will be implementing the circuit described in these slides in this lab.
+
+\end{enumerate}
+
+In the first couple sections of this lab, we will be revisiting the circuits you did in lab 3. Some need to be changed such as the debouncer but others such as the synchronizer do not need changes. \textbf{When we ask you to copy your Verilog from a previous lab, please don't copy over the entire file, but just copy and paste the code you wrote inside your module.} Some of the port declarations for various modules will have changed from previous labs.
+
+
+\section{Lab Overview}
+
+
+Run \verb|git pull| in your \textbf{git cloned} \verb|labs_fa16| directory to \textbf{fetch the latest skeleton files for this lab.}
+\section{AC97 Controller - Checkpoint 2}
+
+In checkpoint two of the project you will be implementing an AC97 audio controller that allows your processor to send linear PCM samples to the AC97 codec (IC) on the board. \\
+
+Our goal for this checkpoint is to enable our processor to synthesize or load a time domain audio waveform, and then send digital samples of that waveform out of the FPGA to the audio codec on the board. The audio codec contains digital to analog converters and filters inside which take the discrete digital audio samples and convert them to a continuous waveform. Then, the waveform is transmitted by the codec to the headphone jack on the back of the board. You should be able to then plug in a pair of headphones and hear the audio signal that your processor synthesized. \\
+
+At the end of this checkpoint, you will have your AC97 controller accessible through memory mapped IO, similar to how your UART is accessed. Once you have this checkpoint's modules working, you will be able to load a program onto your processor which allows you to use your keyboard as a piano. The program synthesizes sine waves of various frequencies based on what key you are pressing and will transmit the wave to the codec so you can hear the music you play through your headphones.
+
+\subsection{Introduction to the AC97 Protocol}
+AC97 is a protocol which is used for communication between a producer of audio data and an audio codec. The audio codec present on the FPGA development board (ML505) is the Analog Devices AD1981B Codec. Our processor will send digital packets to this codec using the AC97 protocol. \\
+
+For reference, here is the AD1981B Codec datasheet: \href{http://www.xilinx.com/products/boards/ml505/datasheets/87560554AD1981B_c.pdf}{AD1981B Datasheet}, and here is the official AC97 spec: \href{http://download.intel.com/support/motherboards/desktop/sb/ac97_r23.pdf}{AC97 Spec}. You might have to refer to these as you go about implementing your controller. \\
+
+\subsubsection{Protocol Connections}
+
+\begin{figure}[hbt]
+	\begin{center}
+		\includegraphics[width=6in]{ac97_connections}
+		\caption{Codec to Controller Connections}
+	\end{center}
+\end{figure}
+
+There are 5 wires involved in the AC97 protocol. They are
+
+\begin{enumerate}
+	\item \textbf{SYNC} - tells the codec when a frame is about to start
+	\item \textbf{BIT\_CLK} - a clock from the codec which your controller should synchronize its data transfers with
+	\item \textbf{SDATA\_OUT} - the serial line on which your controller transmits data to the codec
+	\item \textbf{SDATA\_IN} - the serial line on which the codec transmits data to your controller (not used in this checkpoint)
+	\item \textbf{RESET\#} - a signal used by your controller to reset the codec
+\end{enumerate}
+
+The way in which your controller transmits audio samples (linear PCM) to the codec is through the SDATA\_OUT wire. There is a specific method of framing the samples so that the codec knows how to read them which is defined by the AC97 spec. \\
+
+\subsubsection{How Data is Transmitted}
+AC97 is a serial interface: data is transmitted to and from the codec one bit at a time. On every cycle of the AC97 bit clock (BIT\_CLK), one bit of data is transfered from the AC97 controller (on the FPGA) to the codec over the SDATA\_OUT wire, and one bit of data is transfered from the codec to the FPGA over the SDATA\_IN wire. \\
+
+The constant streams of data passing between the codec and the FPGA are divided into frames. The bit clock is generated by the codec, and runs at 12.288MHz. There are 256 bits per frame, so 48,000 frames are sent per second. This is where the 48kHz sampling rate of the codec comes from. Each frame sent to the codec provides one 20-bit sample for each of the DACs in the codec, and each frame sent by the codec provides one 20-bit sample from each of the codec's ADCs. \\
+
+Frames are divided into twelve slots of 20 bits each, plus a 16-bit tag field, which serves as the frame header. Each slot serves a different purpose and contains various types of data to be sent to the codec. Each slot should be sent with the MSB first going down to the LSB. For example if you were to send data[19:0] in slot 1, you would begin by sending data[19] and finish by sending data[0]. \\
+
+The start of each frame is indicated by a rising edge of the SYNC signal. The SYNC signal goes high one clock cycle before the first bit of a frame, and goes low at the same time as the last bit of the tag field is sent. The diagrams below will summarize how frames are sent using the AC97 protocol. \\
+
+\begin{figure}[hbt]
+	\begin{center}
+		\includegraphics[width=6in]{ac97_framing}
+		\caption{Framing for AC97}
+	\end{center}
+\end{figure}
+
+\begin{figure}[hbt]
+	\begin{center}
+		\includegraphics[width=6in]{ac97_framing_detail}
+		\caption{Framing for AC97 with Timing Details}
+	\end{center}
+\end{figure}
+
+\subsubsection{Sending the Frame Tag}
+
+The bits in the tag slot are indicate which, if any, of the other slots in the frame are valid. The tag bits are assigned as follows:
+
+\renewcommand{\arraystretch}{1.5}
+\begin{center}
+	\begin{tabular}{ | l | l | p{8cm} |}
+		\hline
+		Bit & Description & Value \\ \hline
+		15 & Frame Valid & Should be 1 always  \\ \hline
+		14 & Slot 1: Valid Register Address & Should be 1 if we are writing or reading from a control register in the codec  \\ \hline
+		13 & Slot 2: Valid Register Data & Should be 1 if we are writing to a control register in the codec \\ \hline
+		12 & Slot 3: PCM Left Channel Valid Data & Should be 1 if we have a sample to send to the codec  \\ \hline
+		11 & Slot 4: PCM Right Channel Valid Data & Should be 1 if we have a sample to send to the codec  \\ \hline
+		10-0 & Etc. Valid Bits & Should be set to 0 \\ \hline		
+	\end{tabular}
+\end{center}
+
+\subsubsection{Setting Control Registers With Slot 1 + 2}
+After you send the correct tag through SDATA\_OUT, you will then need to send slots 0 and 1. These slots contain an address and a value which refer to some control register on the codec. The codec contains a multitude of registers which control various features (volume, muting, etc.). Our controller will need to manipulate some registers to unmute the codec and to set the volume appropriately. \\
+
+You should refer to the codec datasheet, specifically the table on page 12 to get the details of these control registers. We have specified below the registers that you will need to manipulate. \\
+
+\begin{center}
+	\begin{tabular}{ | l | l | p{8cm} |}
+		\hline
+		Reg Address & Description & Value \\ \hline
+		0x02 & Master Volume & Should unset the mute bit and set right and left volume \\ \hline
+		0x04 & Headphone Volume & Should unset the mute bit and set right and left volume \\ \hline
+		0x18 & PCM-Out Volume & Should unset the mute bit and set right and left volume \\ \hline
+	\end{tabular}
+\end{center}
+
+In slot 1, the command register address needs to be specified as follows in 20 bits.
+\begin{enumerate}
+	\item Bit[19] - Read/Write Command (1 = read, 0 = write)
+	\item Bit[18:12] - Control Register Index/Address (64 16-bit locations, addressed on even byte boundaries)
+	\item Bit[11:0] - Set to 0
+\end{enumerate}
+
+The first bit (MSB) sampled by AC97 indicates whether the current control transaction in this frame is a read or write operation. The following 7 bit positions communicate the targeted control register address. The trailing 12 bits should be 0. \\
+
+In slot 2, the command register data needs to be specified as follows in 20 bits:
+
+\begin{enumerate}
+	\item Bit[19:4] - Control Register Write Data
+	\item Bit[3:0] - Set to 0
+\end{enumerate}
+
+If we are writing data to a register, you must send the data with the MSB first in the first 16 bits of slot 2. If you are reading data, the entire slot 2 must be filled with 0s. \\
+
+\subsubsection{Sending Linear PCM (pulse code modulation) Samples in Slot 3 + 4}
+The next 2 slots (slots 3 and 4) are used for sending the actual audio samples you want the codec to push to the headphone output. Remember that the samples must be transmitted MSB first and each sample is 20 bits wide. Also keep in mind that each sample is a signed integer encoded with 2s complement, so the total range is roughly $ 2^{20} /2 $.
+
+Fill the remaining slots (slots 5-12) with all 0s for each 20-bit slot.
+
+\subsection{Codec Timing}
+The datasheet is useful for figuring out how the timing works with the codec. Pay close attention to the timing parameters and diagrams on pages 6-7 of the datasheet as your controller needs to be coded with those in mind. \\
+
+Your controller will need to send bits on the rising edges of BIT\_CLK, and the codec will sample them on the falling edge of the BIT\_CLK. The BIT\_CLK is provided by the codec.
+
+\subsubsection{Codec Reset}
+Your controller will have to perform a cold reset of the codec when it receives a reset signal from FPGA board (when you press the center compass button). The cold reset timing is critical, since if your controller doesn't hold the reset properly, the codec may lose its clock.\\
+
+This timing diagram below is crucial to understanding how to reset the codec.\\
+
+\begin{figure}[hbt]
+	\begin{center}
+		\includegraphics[width=6in]{ac97_codec_timing}
+		\caption{Reset Timing Diagram from Datasheet}
+	\end{center}
+\end{figure}
+
+You will notice from the diagram, that the reset signal that your controller will send to the codec is active low, which means that to assert reset, you have to pull the signal low. You will need to pull the reset signal low for at least $t_{RST_LOW}$ which is defined in the datasheet. While the reset signal is being asserted, keep in mind that the codec will stop producing the BIT\_CLK and thus you cannot rely on it during reset; you must instead rely on the clock going into your processor for reset. \\
+
+Once the reset signal has been asserted for the required time, after a delay of $t_{RST2CLK}$, the BIT\_CLK will begin to oscillate, after which you can begin transmission. When the codec undergoes a cold reset, all its registers are set to their default values.
+
+\subsubsection{SYNC Signal for Frame Timing}
+The codec needs a way to know when a frame is about to begin so that it can interpret its content appropriately. This is done using the SYNC signal which is sent from your controller to the codec. You should assert SYNC for a total duration of 16 BIT\_CLKs at the beginning of each audio frame. Refer back to Figure 6 to understand how the SYNC signal should be asserted with each frame.
+
+\subsection{Interfacing With RISC-V Processor}
+Our processor will talk with the AC97 controller through memory mapped IO, just as it does with the UART. The new memory map is below.
+
+\begin{table}[hbt]
+	\begin{center}
+		\caption{I/O Memory Map}
+		\label{mem_map2}
+		\begin{tabular}{l l l l}
+			\toprule
+			\textbf{Address} & \textbf{Function} & \textbf{Access} & \textbf{Data Encoding}\\
+			\midrule
+			32'h80000000 & UART control & Read & \{30'b0, DataOutValid, DataInReady\} \\
+			32'h80000004 & UART receiver data & Read & \{24'b0, DataOut\} \\
+			32'h80000008 & UART transmitter data & Write & \{24'b0, DataIn\} \\
+			\midrule
+			32'h80000010 & Cycle counter & Read & Total number of cycles \\
+			32'h80000014 & Instruction counter & Read & Number of instructions executed \\
+			32'h80000018 & Reset  counters to 0 & Write & N/A \\
+			\midrule
+			32'h80000050 & AC97 Controller Control & Read & \{31'b0, controller\_ready\} \\
+			32'h80000054 & AC97 Transmit Sample & Write & \{12'b0, sample\} \\ \bottomrule
+		\end{tabular}
+	\end{center}
+\end{table}
+
+The AC97 controller is different from the UART in an important way. The AC97 controller interfaces the processor clock domain (50/100 Mhz) with the AC97 codec clock domain (12.228 Mhz). There could be registers in your design that are written to and read from using different clocks; you will need to make sure that your registers don't enter a metastable state.\\
+
+Handling the bridge between the two clock domains (BIT\_CLK and cpu\_clk\_g) is a difficult task that you will need to make sure goes smoothly as frequently as possible. To this end, to allow the CPU to write data to the codec, you can use an asynchronous FIFO if you are having a hard time implementing the ready/valid interface directly using synchronizers. The FIFO will isolate the read and write domains by having a separate read clock (BIT\_CLK) and a separate write clock (cpu\_clk\_g). This will make setting the ready/valid control signals easy.\\
+
+We encourage you to look online for resources on crossing clock domains, metastability, and the design of an asynchronous FIFO. We are allowing you to use any resources to figure out the general block diagrams necessary to build the async FIFO; however, you cannot use any Verilog code you find online, and the entire implementation must be done by your group only. You can implement a FIFO of any number of entries, but powers of two are usually easier. Your FIFO should be able to hold at least 2 entries, but you should write your FIFO using parameters so you can extend its depth to be used in more situations.\\
+
+Here are some articles that you may find useful for crossing clock domains (you can implement the ready/valid interface without using an async FIFO):
+\begin{itemize}
+	\item \href{http://www.asic-world.com/tidbits/clock_domain.html}{Basic Intro to Crossing Clock Domains (using synchronizers)}
+	\item \href{http://www.edn.com/electronics-blogs/day-in-the-life-of-a-chip-designer/4435339/Synchronizer-techniques-for-multi-clock-domain-SoCs}{Synchronizer Techniques}
+	\item \href{http://www.eetimes.com/document.asp?doc_id=1279906}{Understanding Clock Domain Crossing Issues}
+	\item \href{https://filebox.ece.vt.edu/~athanas/4514/ledadoc/html/pol_cdc.html}{Clock Domain Crossing}
+	\item \href{http://www.eng.utah.edu/~kstevens/6770/reports/09-fifo-synchronization.pdf}{Synchronization Techniques for FIFOs}
+\end{itemize}
+
+\subsection{Testing}
+You should begin by pulling the latest skeleton code from the staff Github repository. You should edit the \verb|MakeFile| and set the \verb|EECS151_CHKPNT| constant to \verb|CHKPNT_2|.
+
+\subsubsection{AC97 Controller Without Processor}
+Your first goal should be to get the AC97 controller to work without using your processor. You should generate a square wave of a known frequency inside your controller and should output that square wave through the SDATA\_OUT line. You should instantiate your AC97 controller in the top level module (ml505top.v) and should not synthesize your CPU (you can comment it out). You should be able to verify that your controller is performing properly by plugging in headphones to the board and hearing a clean square wave at your test frequency.
+
+To get this working properly, it will help to build a model of the AC97 codec in Verilog and run simulations against this model. This checkpoint involves writing tests for your controller, which will be necessary to get the timing correct. Once you get this task working, you should think about ways to implement the ready/valid interface.
+
+\subsubsection{Testing AC97 Controller Ready/Valid Interface Without Processor}
+Next, move the square wave generation to the top level module and feed the square wave into the AC97 controller through the ready/valid interface. Try impacting this design to the board and you should be able to hear the same square wave as in the previous design. You should add tests for your ready/valid interface here.
+
+\subsubsection{Testing AC97 Controller With Processor Memory Map}
+Now, reintegrate the processor into your design and connect your AC97 controller to the processor in parallel with the UART. You should write a small test assembly or C program which generates a square wave and sends it to the AC97 controller through memory mapped IO. Once you impact this design on the board, you should still be able to hear the same square wave, but this time, your processor is the one that is generating it.
+
+\subsubsection{Testing Using Piano Program}
+Finally, load the program that we will supply to you which uses the keyboard connected to your workstation as a piano. Based on which keys you press, the program will instruct the processor to generate a sine wave of a particular frequency and send it to the controller.
+
+
+\section{Conclusion + Checkoff}
+You are done with lab 6! Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.\\
+
+\subsection{Checkoff Tasks}
+
+\begin{enumerate}
+	\item Show the TA your working design with the FSM. Be able to transition states by clicking on the north and center buttons and show that your \verb|music_streamer| matches the spec.
+\end{enumerate}
+
+\end{document}
