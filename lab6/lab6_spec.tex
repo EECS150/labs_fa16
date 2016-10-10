@@ -160,9 +160,9 @@ The datasheet is useful for figuring out how the timing works with the codec. Pa
 Your controller will need to send bits on the rising edges of \verb|BIT_CLK|, and the codec will sample them on the falling edge of the \verb|BIT_CLK|. Recall, that the \verb|BIT_CLK| is provided by the codec.
 
 \subsubsection{Codec Reset}
-Your controller will have to perform a cold reset of the codec when it receives a reset signal from FPGA board (when you press the center compass button). The cold reset timing is critical, since if your controller doesn't hold the reset properly, the codec may lose its clock.
+Your controller will have to perform a cold reset of the codec when it receives a reset signal from the FPGA board (when you press the \verb|CPU_RESET| button). The cold reset timing is critical, since if your controller doesn't hold the reset properly, the codec may lose its clock.
 
-This timing diagram below is crucial to understanding how to reset the codec.
+This timing diagram below is critical to understanding how to reset the codec.
 
 \begin{figure}[hbt]
 	\begin{center}
@@ -171,78 +171,31 @@ This timing diagram below is crucial to understanding how to reset the codec.
 	\end{center}
 \end{figure}
 
-You will notice from the diagram, that the reset signal that your controller will send to the codec is active low, which means that to assert reset, you have to pull the signal low. You will need to pull the reset signal low for at least $t_{RST_LOW}$ which is defined in the datasheet. While the reset signal is being asserted, keep in mind that the codec will stop producing the BIT\_CLK and thus you cannot rely on it during reset; you must instead rely on the clock going into your processor for reset. \\
+You will notice from the diagram, that the reset signal that your controller will send to the codec is active low, which means that to assert the reset signal, you have to pull the line low. You will need to pull the reset signal low for at least $t_{RST\_LOW}$ which is defined in the datasheet. While the reset signal is being asserted, the codec will stop producing the \verb|BIT_CLK| and thus you cannot rely on it during reset; you must instead rely on a different clock to time the reset.
 
-Once the reset signal has been asserted for the required time, after a delay of $t_{RST2CLK}$, the BIT\_CLK will begin to oscillate, after which you can begin transmission. When the codec undergoes a cold reset, all its registers are set to their default values.
+Once the reset signal has been asserted for the required time, after a delay of $t_{RST2CLK}$, the \verb|BIT_CLK| will begin to oscillate, after which the controller can begin transmitting frames to the codec. When the codec undergoes a cold reset, all its registers are set to their default values as specified in the datasheet.
 
 \subsubsection{SYNC Signal for Frame Timing}
-The codec needs a way to know when a frame is about to begin so that it can interpret its content appropriately. This is done using the SYNC signal which is sent from your controller to the codec. You should assert SYNC for a total duration of 16 BIT\_CLKs at the beginning of each audio frame. Refer back to Figure 6 to understand how the SYNC signal should be asserted with each frame.
+The codec needs a way to know when a frame is about to begin so that it can interpret its content appropriately. This is done using the \verb|SYNC| signal which is sent from your controller to the codec. You should assert \verb|SYNC| for a total duration of 16 \verb|BIT_CLK|s at the beginning of each audio frame. Refer back to Figure 3 in Section 3.2 to understand how the \verb|SYNC| signal should be asserted with each frame.
 
-\subsection{Interfacing With RISC-V Processor}
-Our processor will talk with the AC97 controller through memory mapped IO, just as it does with the UART. The new memory map is below.
+\section{Building the AC97 Controller}
 
-\begin{table}[hbt]
-	\begin{center}
-		\caption{I/O Memory Map}
-		\label{mem_map2}
-		\begin{tabular}{l l l l}
-			\toprule
-			\textbf{Address} & \textbf{Function} & \textbf{Access} & \textbf{Data Encoding}\\
-			\midrule
-			32'h80000000 & UART control & Read & \{30'b0, DataOutValid, DataInReady\} \\
-			32'h80000004 & UART receiver data & Read & \{24'b0, DataOut\} \\
-			32'h80000008 & UART transmitter data & Write & \{24'b0, DataIn\} \\
-			\midrule
-			32'h80000010 & Cycle counter & Read & Total number of cycles \\
-			32'h80000014 & Instruction counter & Read & Number of instructions executed \\
-			32'h80000018 & Reset  counters to 0 & Write & N/A \\
-			\midrule
-			32'h80000050 & AC97 Controller Control & Read & \{31'b0, controller\_ready\} \\
-			32'h80000054 & AC97 Transmit Sample & Write & \{12'b0, sample\} \\ \bottomrule
-		\end{tabular}
-	\end{center}
-\end{table}
-
-The AC97 controller is different from the UART in an important way. The AC97 controller interfaces the processor clock domain (50/100 Mhz) with the AC97 codec clock domain (12.228 Mhz). There could be registers in your design that are written to and read from using different clocks; you will need to make sure that your registers don't enter a metastable state.\\
-
-Handling the bridge between the two clock domains (BIT\_CLK and cpu\_clk\_g) is a difficult task that you will need to make sure goes smoothly as frequently as possible. To this end, to allow the CPU to write data to the codec, you can use an asynchronous FIFO if you are having a hard time implementing the ready/valid interface directly using synchronizers. The FIFO will isolate the read and write domains by having a separate read clock (BIT\_CLK) and a separate write clock (cpu\_clk\_g). This will make setting the ready/valid control signals easy.\\
-
-We encourage you to look online for resources on crossing clock domains, metastability, and the design of an asynchronous FIFO. We are allowing you to use any resources to figure out the general block diagrams necessary to build the async FIFO; however, you cannot use any Verilog code you find online, and the entire implementation must be done by your group only. You can implement a FIFO of any number of entries, but powers of two are usually easier. Your FIFO should be able to hold at least 2 entries, but you should write your FIFO using parameters so you can extend its depth to be used in more situations.\\
-
-Here are some articles that you may find useful for crossing clock domains (you can implement the ready/valid interface without using an async FIFO):
-\begin{itemize}
-	\item \href{http://www.asic-world.com/tidbits/clock_domain.html}{Basic Intro to Crossing Clock Domains (using synchronizers)}
-	\item \href{http://www.edn.com/electronics-blogs/day-in-the-life-of-a-chip-designer/4435339/Synchronizer-techniques-for-multi-clock-domain-SoCs}{Synchronizer Techniques}
-	\item \href{http://www.eetimes.com/document.asp?doc_id=1279906}{Understanding Clock Domain Crossing Issues}
-	\item \href{https://filebox.ece.vt.edu/~athanas/4514/ledadoc/html/pol_cdc.html}{Clock Domain Crossing}
-	\item \href{http://www.eng.utah.edu/~kstevens/6770/reports/09-fifo-synchronization.pdf}{Synchronization Techniques for FIFOs}
-\end{itemize}
 
 \subsection{Testing}
-You should begin by pulling the latest skeleton code from the staff Github repository. You should edit the \verb|MakeFile| and set the \verb|EECS151_CHKPNT| constant to \verb|CHKPNT_2|.
 
-\subsubsection{AC97 Controller Without Processor}
-Your first goal should be to get the AC97 controller to work without using your processor. You should generate a square wave of a known frequency inside your controller and should output that square wave through the SDATA\_OUT line. You should instantiate your AC97 controller in the top level module (ml505top.v) and should not synthesize your CPU (you can comment it out). You should be able to verify that your controller is performing properly by plugging in headphones to the board and hearing a clean square wave at your test frequency.
+\section{Connect the music\_streamer and tone\_generator}
 
-To get this working properly, it will help to build a model of the AC97 codec in Verilog and run simulations against this model. This checkpoint involves writing tests for your controller, which will be necessary to get the timing correct. Once you get this task working, you should think about ways to implement the ready/valid interface.
+\subsection{Testing}
 
-\subsubsection{Testing AC97 Controller Ready/Valid Interface Without Processor}
-Next, move the square wave generation to the top level module and feed the square wave into the AC97 controller through the ready/valid interface. Try impacting this design to the board and you should be able to hear the same square wave as in the previous design. You should add tests for your ready/valid interface here.
-
-\subsubsection{Testing AC97 Controller With Processor Memory Map}
-Now, reintegrate the processor into your design and connect your AC97 controller to the processor in parallel with the UART. You should write a small test assembly or C program which generates a square wave and sends it to the AC97 controller through memory mapped IO. Once you impact this design on the board, you should still be able to hear the same square wave, but this time, your processor is the one that is generating it.
-
-\subsubsection{Testing Using Piano Program}
-Finally, load the program that we will supply to you which uses the keyboard connected to your workstation as a piano. Based on which keys you press, the program will instruct the processor to generate a sine wave of a particular frequency and send it to the controller.
-
+\section{Try it on the FPGA!}
 
 \section{Conclusion + Checkoff}
-You are done with lab 6! Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.\\
+You are done with lab 6! Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.
 
 \subsection{Checkoff Tasks}
 
 \begin{enumerate}
-	\item Show the TA your working design with the FSM. Be able to transition states by clicking on the north and center buttons and show that your \verb|music_streamer| matches the spec.
+	\item Show the TA your working AC97 controller by demonstrating the state machine in the \verb|music_streamer| working and sending audio to the AC97 codec.
 \end{enumerate}
 
 \end{document}
