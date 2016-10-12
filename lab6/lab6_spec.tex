@@ -49,10 +49,10 @@ Run \verb|git pull| in your \textbf{git cloned} \verb|labs_fa16| directory to \t
 
 In this lab, we will create a AC97 controller that lives on the FPGA. The controller will interact with an AC97 audio codec IC on the ML505 development board. Your controller will implement a portion of the AC97 protocol that will allow it to send digital audio data and control signals to the IC.
 
-\textbf{This lab will be done in teams of two; it will involve building a peripheral used later in the project.}
+\textbf{This lab will be done in teams of two; it will involve building a peripheral used in the project.}
 
 \section{Introduction to the AC97 Protocol}
-AC97 is a protocol which is used for communication between a source/producer of audio data and an audio codec. The audio codec present on the FPGA development board (ML505) is the Analog Devices AD1981B Codec. Our processor will send digital packets to this codec using the AC97 protocol.
+AC97 is a protocol which is used for communication between a source/producer of audio data and an audio codec. The audio codec present on the FPGA development board (ML505) is the Analog Devices AD1981B Codec. Our AC97 controller will send digital packets to this codec using the AC97 protocol. The AC97 codec will decode the signals sent to it and send a voltage out through the headphone jack on the back of the ML505 board. You can plug in your headphones and listen to its output.
 
 Refer to the AD1981B Codec datasheet and the official AC97 spec when working through this lab. They are in the \verb|labs_fa16/docs| folder.
 
@@ -246,28 +246,70 @@ You should read the datasheet for the codec and understand how to reset it. Make
 \textbf{Be careful, however, since resetting the codec too frequently or for too long can cause the codec to lose its clock and stop operating.} If this happens to you, you can recover by re-running \verb|make impact|.
 
 \subsection{Resetting Controller Registers}
+When the \verb|system_reset| is asserted, you should only touch one register, which is your reset clock counter that times the reset. Other registers that are modified by the posedge of the \verb|bit_clk| shouldn't be touched.
 
+In order to get simulation working and your other design registers (frame shift register, frame counter, etc.) in your design to a default state, you should use reg assignments.
+
+\begin{minted}{verilog}
+	reg [255:0] frame_to_send = 256'd0;
+\end{minted}
 
 \subsection{Clock Crossing}
+The design of the AC97 controller is tricky since it involves 2 clocks. Generally, you do not want registers that are set by one clock, to be used in combinational logic and then registered by another clock. However, we have that circumstance in this design.
+
+Our \verb|music_streamer| and \verb|tone_generator| are being clocked by the 33 Mhz system clock, while the logic that sends data over \verb|sdata_out| is being clocked by the \verb|bit_clk|. Ordinarily, this would pose a problem, since the \verb|square_wave| register is being set in the system clock domain, and its value is being read, used, and registered in the \verb|bit_clk| domain. 
+
+However, in this particular case, since the \verb|square_wave| register updates are so infrequent with respect to both the clocks, and a brief glitch in the square wave would make hardly any impact on the audio output, we can use the \verb|square_wave| value in the \verb|bit_clk| domain without much worry.
+
+\textbf{This happy circumstance will not persist into the project.} In the project you will design a more sophisticated synchronization scheme to move multiple bits in parallel from the system clock domain to the \verb|bit_clk| domain using an async FIFO.
 
 \subsection{Volume Control}
-WARNING: Attenuate the audio using the control registers otherwise you may destroy your headphones by blowing the drivers with too much power!!! Check with the TA if you are unsure if you have attenuated your volume levels appropriately.
+Your AC97 controller needs to unmute and set the volume of the audio output using three registers in the codec. These registers should be set as such (look at the datasheet for the details):
+
+\begin{center}
+	\begin{tabular}{ | l | l | p{8cm} |}
+		\hline
+		\textbf{Reg Address} & \textbf{Description} & \textbf{Value} \\ \hline
+		0x02 & Master Volume & Unmute and set R/L attenuations equal to \verb|{1'b1, volume_control}| \\ \hline
+		0x04 & Headphone Volume & Unmute and set R/L attenuations equal to \verb|{1'b1, volume_control}| \\ \hline
+		0x18 & PCM-Out Volume & Unmute and set R/L gain to 0dB \\ \hline
+	\end{tabular}
+\end{center}
+
+\textbf{WARNING: If sufficient attenuation isn't applied, the codec may supply too much voltage to your headphones and destroy them. Check with the TA if you are unsure about the values written to the registers.}
 
 \subsection{SYNC Signal Timing}
-WARNING: If you make sync, reset, and sdata\_out registers in the controller, they must ALL be registers and they should march in line.
+As a note, if you create registers for the \verb|sync| and \verb|sdata_out| signals, make sure that they are both registered the same number of times and march in line.
+
+You will need to make sure the \verb|sync| signal is applied properly as you send each AC97 frame. Refer to Figure 3 in Section 3.2 for details. You should raise the \verb|sync| signal on the last bit of the previous frame and hold it high until bit 15 has been sent of the next frame.
 
 \subsection{Testing in Simulation}
-block-level testbench
+To test our AC97 controller, we will be using a \textbf{block-level testbench}. This testbench will simulate our AC97 controller in isolation to see if it performs to spec.
+
+The source for this testbench is \verb|lab6/src/ac97_controller_testbench.v|. Run the testbench as usual by running \verb|make| in the \verb|lab6/sim| directory. This testbench isn't self checking so you should look at the Verilog file and manually inspect the output waveform to verify that all specifications are met. You should extend the testbench so that it sends more stimulus to the AC97 controller (like changing the volume).
+
+You should make sure that ALL the signals in your AC97 controller are well defined (not X) for the entirety of the simulation.
 
 \section{Connect the music\_streamer and tone\_generator}
 
 \subsection{Testing in Simulation}
-system/chip-level testbench
+We previously used a block-level testbench to just test the AC97 controller in isolation. Now we will use a \textbf{system/chip-level testbench} to test our entire system at a higher level. This dichotomy is similar to the difference between unit tests and integration tests in software.
+
+Take a look at the source for this testbench in \verb|lab6/src/system_testbench.v|. You will notice that instead of instantiating the AC97 controller, it instantiates \verb|ml505top|. Now, the stimulus that we supply to our DUT represent signals coming into the FPGA.
+
+This testbench will simulate the entire system which connects your AC97 controller to the \verb|tone_generator|, which is connected to the \verb|music_streamer|, which has connections from your input conditioning circuits (synchronizer, debouncer, edge detector, rotary decoder). This testbench isn't self-checking either, so you should add stimulus to the DUT to make it respond in some way and see that it is reflected in the waveform.
+
+You should make sure that ALL of the signals in your entire system are well defined (not X) for the entirety of the simulation.
 
 \section{Try it on the FPGA!}
+With both simulations indicating that everything seems to be working, run \verb|make| and \verb|make impact| from the \verb|lab6| directory. When your design is on the FPGA, your music streamer FSM from Lab 4 should still work as usual. By turning on the 1st and last DIP switches, the piezo output will be enabled. But now, as long as the 1st DIP switch is turned on, you can plug in a pair of headphones to listen to the output of the music streamer FSM. 
+
+You can use DIP switches 3-6 to change the volume of the audio output. Keep in mind that making all the switches high will give you the max attenuation, which corresponds to the quietest volume.
 
 \section{Conclusion + Checkoff}
 You are done with lab 6! Please write down any and all feedback and criticism of this lab and share it with the TA. This is a brand new lab and we welcome everyone's input so that it can be improved.
+
+The differences between a block and system level testbench will be critical in the testing of your project. You will use both types of testbenches extensively to verify correct behavior of all the modules you write.
 
 \subsection{Checkoff Tasks}
 
